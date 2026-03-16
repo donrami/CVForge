@@ -1,0 +1,85 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Application {
+  id                String        @id @default(cuid())
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+  deletedAt         DateTime?     // Soft delete field
+
+  // Job info
+  companyName       String
+  jobTitle          String
+  jobDescription    String        @db.Text
+  targetLanguage    Language      @default(EN)
+
+  // Generation config
+  iterationCount    Int           @default(2)
+  additionalContext String?       @db.Text
+
+  // Output
+  latexOutput       String        @db.Text
+  pdfGenerated      Boolean       @default(false)
+  generationLog     Json          // Changed from String to Json per spec
+
+  // Tracker
+  status            AppStatus     @default(GENERATED)
+  notes             String?       @db.Text
+  appliedAt         DateTime?
+  interviewAt       DateTime?
+  offerAt           DateTime?
+  rejectedAt        DateTime?
+
+  // Regeneration lineage
+  parentId          String?
+  parent            Application?  @relation("Regenerations", fields: [parentId], references: [id])
+  regenerations     Application[] @relation("Regenerations")
+
+  // Index for soft delete queries
+  @@index([deletedAt])
+}
+
+enum Language {
+  EN
+  DE
+}
+
+enum AppStatus {
+  GENERATED
+  APPLIED
+  INTERVIEW
+  OFFER
+  REJECTED
+  WITHDRAWN
+}
+
+model Certificate {
+  id               String   @id @default(cuid())
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  // Certificate details
+  name             String
+  issuer           String
+  issueDate        String?  // Flexible date format as found on certificate
+  expiryDate       String?  // For certifications that expire
+  credentialId     String?  // Certificate/license number
+  skills           String[] // Skills covered (PostgreSQL array)
+  description      String?  @db.Text
+
+  // Source tracking
+  sourceFile       String?  // Original filename
+  verified         Boolean  @default(false)
+
+  // Raw extracted text (for debugging/reference)
+  rawExtractedText String?  @db.Text
+
+  // Confidence score from AI extraction (0-1)
+  confidence       Float    @default(0)
+}

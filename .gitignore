@@ -1,0 +1,57 @@
+# Dependencies
+node_modules/
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Build outputs
+dist/
+build/
+*.tsbuildinfo
+
+# Coverage
+coverage/
+*.lcov
+
+# Logs
+*.log
+logs/
+
+# Environment files
+.env
+.env.local
+.env.*.local
+.env.production
+.env.development
+!.env.example
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Personal context files
+context/
+
+# IDE
+.vscode/settings.json
+.vscode/launch.json
+.idea/
+*.swp
+*.swo
+
+# CVForge specific - User data (NEVER commit personal information)
+# Keep the directory but ignore user-modified content
+/context/*
+!/context/master-cv.tex
+!/context/certificates.md
+!/context/instructions.md
+
+# Generated files (runtime output)
+/generated/*
+!/generated/.gitkeep
+
+# Prisma
+prisma/migrations/*/migration_lock.toml
+
+# Docker
+.dockerignore

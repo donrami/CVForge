@@ -1,0 +1,58 @@
+@import "tailwindcss";
+
+@theme {
+  --color-bg-base: #0f0f0f;
+  --color-bg-surface: #181818;
+  --color-bg-elevated: #222222;
+  --color-border: #2e2e2e;
+  --color-text-primary: #f0ede8;
+  --color-text-secondary: #8a8680;
+  --color-text-muted: #4a4845;
+  --color-accent: #c8a96e;
+  --color-accent-hover: #d4b97e;
+  --color-status-generated: #4a7fa5;
+  --color-status-applied: #5a8f6a;
+  --color-status-interview: #c8a96e;
+  --color-status-offer: #6abf8a;
+  --color-status-rejected: #8a4a4a;
+  --color-status-withdrawn: #4a4845;
+  --color-destructive: #a05050;
+  
+  --font-sans: "DM Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "DM Serif Display", ui-serif, Georgia, Cambria, "Times New Roman", Times, serif;
+  --font-mono: "DM Mono", "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+}
+
+@layer base {
+  body {
+    background-color: var(--color-bg-base);
+    color: var(--color-text-primary);
+    font-family: var(--font-sans);
+  }
+}
+
+/* Themed scrollbars for textareas */
+textarea::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+textarea::-webkit-scrollbar-track {
+  background: var(--color-bg-elevated);
+  border-radius: 4px;
+}
+
+textarea::-webkit-scrollbar-thumb {
+  background: var(--color-text-muted);
+  border-radius: 4px;
+}
+
+textarea::-webkit-scrollbar-thumb:hover {
+  background: var(--color-text-secondary);
+}
+
+/* Firefox scrollbar styling */
+textarea {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-text-muted) var(--color-bg-elevated);
+}
