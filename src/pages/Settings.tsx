@@ -251,7 +251,7 @@ export function Settings() {
             rows={15}
             value={context['master-cv.tex']}
             onChange={e => setContext({...context, 'master-cv.tex': e.target.value})}
-            className="w-full bg-bg-base border border-border rounded-sm p-4 text-text-primary focus:outline-none focus:border-accent transition-colors font-mono text-xs whitespace-pre-wrap"
+            className="w-full bg-bg-base border border-border rounded-sm p-4 text-text-primary focus:outline-none focus:border-accent transition-colors font-mono text-xs whitespace-pre-wrap resize-y"
             spellCheck={false}
           />
         </section>
@@ -325,13 +325,13 @@ export function Settings() {
           {/* Tab Content */}
           {activeTab === 'manual' ? (
             <div className="space-y-4">
-              <textarea
-                rows={10}
-                value={context['certificates.md']}
-                onChange={e => setContext({...context, 'certificates.md': e.target.value})}
-                className="w-full bg-bg-base border border-border rounded-sm p-4 text-text-primary focus:outline-none focus:border-accent transition-colors font-mono text-xs whitespace-pre-wrap"
-                spellCheck={false}
-              />
+               <textarea
+                 rows={10}
+                 value={context['certificates.md']}
+                 onChange={e => setContext({...context, 'certificates.md': e.target.value})}
+                 className="w-full bg-bg-base border border-border rounded-sm p-4 text-text-primary focus:outline-none focus:border-accent transition-colors font-mono text-xs whitespace-pre-wrap resize-y"
+                 spellCheck={false}
+               />
               
               {/* Saved certificates summary */}
               {savedCerts.length > 0 && (
@@ -402,7 +402,7 @@ export function Settings() {
             rows={8}
             value={context['instructions.md']}
             onChange={e => setContext({...context, 'instructions.md': e.target.value})}
-            className="w-full bg-bg-base border border-border rounded-sm p-4 text-text-primary focus:outline-none focus:border-accent transition-colors font-mono text-xs whitespace-pre-wrap"
+            className="w-full bg-bg-base border border-border rounded-sm p-4 text-text-primary focus:outline-none focus:border-accent transition-colors font-mono text-xs whitespace-pre-wrap resize-y"
             spellCheck={false}
           />
         </section>

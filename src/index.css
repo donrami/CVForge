@@ -55,4 +55,27 @@ textarea::-webkit-scrollbar-thumb:hover {
 textarea {
   scrollbar-width: thin;
   scrollbar-color: var(--color-text-muted) var(--color-bg-elevated);
+  resize: vertical; /* Allow vertical resizing only */
+}
+
+/* Chrome/Safari resize handle styling */
+textarea::-webkit-resizer {
+  border: 1px solid var(--color-border);
+  background-color: var(--color-bg-surface);
+  border-radius: 0 0 4px 0;
+}
+
+/* Firefox resize handle styling */
+textarea {
+  resize: vertical;
+}
+
+/* Button cursor pointer */
+button,
+[role="button"],
+input[type="submit"],
+input[type="button"],
+input[type="reset"],
+.cursor-pointer {
+  cursor: pointer;
 }
