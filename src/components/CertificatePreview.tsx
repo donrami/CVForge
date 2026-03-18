@@ -252,7 +252,7 @@ export function CertificatePreview({ results, onSave, onCancel, saving = false }
                     onChange={e => updateCertificate(index, 'description', e.target.value)}
                     placeholder="Brief description of what this certification validates..."
                     rows={2}
-                    className="w-full bg-bg-base border border-border rounded px-3 py-2 text-text-primary focus:outline-none focus:border-accent resize-none"
+                    className="w-full bg-bg-base border border-border rounded px-3 py-2 text-text-primary focus:outline-none focus:border-accent resize-y"
                   />
                 </div>
 

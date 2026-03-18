@@ -1,6 +1,5 @@
 # Dependencies
 node_modules/
-package-lock.json
 yarn.lock
 pnpm-lock.yaml
 
@@ -29,7 +28,7 @@ logs/
 .DS_Store
 Thumbs.db
 
-# Personal context files
+# Personal context files (CV, certificates, instructions - NEVER commit)
 context/
 
 # IDE
@@ -39,16 +38,11 @@ context/
 *.swp
 *.swo
 
-# CVForge specific - User data (NEVER commit personal information)
-# Keep the directory but ignore user-modified content
-/context/*
-!/context/master-cv.tex
-!/context/certificates.md
-!/context/instructions.md
-
 # Generated files (runtime output)
-/generated/*
-!/generated/.gitkeep
+generated/
+
+# Uploaded files (certificates, profile images)
+uploads/
 
 # Prisma
 prisma/migrations/*/migration_lock.toml

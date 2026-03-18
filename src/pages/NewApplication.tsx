@@ -1,9 +1,11 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowRight, Loader2 } from 'lucide-react';
+import { ArrowRight, Loader2, ChevronUp, ChevronDown } from 'lucide-react';
+import { useDialog } from '../context/DialogContext';
 
 export function NewApplication() {
   const navigate = useNavigate();
+  const { toast } = useDialog();
   const [loading, setLoading] = useState(false);
   const [progress, setProgress] = useState<string[]>([]);
   const [formData, setFormData] = useState({
@@ -14,6 +16,20 @@ export function NewApplication() {
     iterationCount: 2,
     additionalContext: '',
   });
+
+  const handleIncrement = () => {
+    setFormData(prev => ({
+      ...prev,
+      iterationCount: Math.min(5, prev.iterationCount + 1)
+    }));
+  };
+
+  const handleDecrement = () => {
+    setFormData(prev => ({
+      ...prev,
+      iterationCount: Math.max(1, prev.iterationCount - 1)
+    }));
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -45,7 +61,8 @@ export function NewApplication() {
             if (data.type === 'step') {
               setProgress(p => [...p, data.message]);
             } else if (data.type === 'complete') {
-              navigate(`/applications/${data.applicationId}`);
+              toast('CV generated successfully!', 'success');
+              navigate(`/?highlighted=${data.applicationId}`);
             } else if (data.type === 'error') {
               throw new Error(data.message);
             }
@@ -117,13 +134,13 @@ export function NewApplication() {
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-6">
+          <div className="grid grid-cols-2 gap-6 items-end">
             <div className="space-y-2">
               <label className="block text-sm font-medium text-text-secondary uppercase tracking-wider">Target Language</label>
-              <select 
+              <select
                 value={formData.targetLanguage}
                 onChange={e => setFormData({...formData, targetLanguage: e.target.value})}
-                className="w-full bg-bg-base border border-border rounded-sm px-4 py-2 text-text-primary focus:outline-none focus:border-accent transition-colors appearance-none"
+                className="w-full h-[42px] bg-bg-base border border-border rounded-sm px-4 py-2 text-text-primary focus:outline-none focus:border-accent transition-colors appearance-none"
               >
                 <option value="EN">English (EN)</option>
                 <option value="DE">German (DE)</option>
@@ -131,13 +148,31 @@ export function NewApplication() {
             </div>
             <div className="space-y-2">
               <label className="block text-sm font-medium text-text-secondary uppercase tracking-wider">Critique Passes</label>
-              <input 
-                type="number" 
-                min="1" max="5"
-                value={formData.iterationCount}
-                onChange={e => setFormData({...formData, iterationCount: parseInt(e.target.value)})}
-                className="w-full bg-bg-base border border-border rounded-sm px-4 py-2 text-text-primary focus:outline-none focus:border-accent transition-colors"
-              />
+              <div className="flex items-center h-[42px] bg-bg-base border border-border rounded-sm focus-within:border-accent transition-colors">
+                <span className="flex-1 px-4 py-2 text-text-primary">
+                  {formData.iterationCount}
+                </span>
+                <div className="flex flex-col border-l border-border">
+                  <button
+                    type="button"
+                    onClick={handleIncrement}
+                    disabled={formData.iterationCount >= 5}
+                    className="flex items-center justify-center px-3 py-1 text-text-secondary hover:text-accent transition-colors border-b border-border disabled:opacity-30 disabled:cursor-not-allowed"
+                    aria-label="Increase critique passes"
+                  >
+                    <ChevronUp size={14} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleDecrement}
+                    disabled={formData.iterationCount <= 1}
+                    className="flex items-center justify-center px-3 py-1 text-text-secondary hover:text-accent transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                    aria-label="Decrease critique passes"
+                  >
+                    <ChevronDown size={14} />
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
 

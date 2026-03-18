@@ -7,6 +7,7 @@ import { Login } from './pages/Login';
 import { Settings } from './pages/Settings';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { DialogProvider } from './context/DialogContext';
+import { BackgroundTexture } from './components/BackgroundTexture';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading } = useAuth();
@@ -18,6 +19,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 export default function App() {
   return (
     <AuthProvider>
+      <BackgroundTexture />
       <DialogProvider>
         <Routes>
           <Route path="/login" element={<Login />} />

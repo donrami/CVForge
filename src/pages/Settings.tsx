@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { Save, Check, Loader2, Upload, Award, FileText, Trash2, CheckCircle } from 'lucide-react';
+import { useEffect, useState, useRef } from 'react';
+import { Save, Check, Loader2, Upload, Award, FileText, Trash2, CheckCircle, User, X } from 'lucide-react';
 import { CertificateUpload, type ExtractionResult } from '../components/CertificateUpload';
 import { CertificatePreview, type Certificate } from '../components/CertificatePreview';
 import { useDialog } from '../context/DialogContext';
@@ -22,6 +22,11 @@ export function Settings() {
   const [, setLoadingCerts] = useState(false);
   const [syncSuccess, setSyncSuccess] = useState(false);
 
+  // Profile image state
+  const [profileImage, setProfileImage] = useState<{ exists: boolean; url?: string; filename?: string }>({ exists: false });
+  const [uploadingProfile, setUploadingProfile] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   useEffect(() => {
     fetch('/api/settings/context')
       .then(res => res.json())
@@ -32,6 +37,16 @@ export function Settings() {
     
     // Load saved certificates
     loadCertificates();
+    
+    // Load profile image
+    fetch('/api/settings/profile-image')
+      .then(res => res.json())
+      .then(data => {
+        setProfileImage(data);
+      })
+      .catch(() => {
+        setProfileImage({ exists: false });
+      });
   }, []);
 
   const loadCertificates = async () => {
@@ -46,6 +61,67 @@ export function Settings() {
       console.error('Failed to load certificates:', e);
     } finally {
       setLoadingCerts(false);
+    }
+  };
+
+  const handleProfileImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    setUploadingProfile(true);
+    const formData = new FormData();
+    formData.append('profileImage', file);
+    
+    try {
+      const res = await fetch('/api/settings/profile-image', {
+        method: 'POST',
+        body: formData,
+      });
+      
+      if (res.ok) {
+        const data = await res.json();
+        setProfileImage({ exists: true, url: data.url, filename: data.filename });
+        toast('Profile picture uploaded successfully', 'success');
+      } else {
+        const error = await res.json();
+        toast(error.error || 'Failed to upload profile picture', 'error');
+      }
+    } catch (e) {
+      console.error('Failed to upload profile picture:', e);
+      toast('Failed to upload profile picture', 'error');
+    } finally {
+      setUploadingProfile(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
+  const handleProfileImageDelete = async () => {
+    const confirmed = await confirm({
+      title: 'Delete Profile Picture',
+      message: 'Are you sure you want to delete your profile picture?',
+      confirmText: 'Delete',
+      cancelText: 'Cancel',
+      severity: 'destructive',
+    });
+    
+    if (!confirmed) return;
+    
+    try {
+      const res = await fetch('/api/settings/profile-image', {
+        method: 'DELETE',
+      });
+      
+      if (res.ok) {
+        setProfileImage({ exists: false });
+        toast('Profile picture deleted', 'success');
+      } else {
+        toast('Failed to delete profile picture', 'error');
+      }
+    } catch (e) {
+      console.error('Failed to delete profile picture:', e);
+      toast('Failed to delete profile picture', 'error');
     }
   };
 
@@ -251,9 +327,86 @@ export function Settings() {
             rows={15}
             value={context['master-cv.tex']}
             onChange={e => setContext({...context, 'master-cv.tex': e.target.value})}
-            className="w-full bg-bg-base border border-border rounded-sm p-4 text-text-primary focus:outline-none focus:border-accent transition-colors font-mono text-xs whitespace-pre-wrap resize-y"
+            className="w-full bg-bg-base border border-border rounded-sm p-4 text-text-primary focus:outline-none focus:border-accent transition-colors font-mono whitespace-pre-wrap resize-y"
             spellCheck={false}
           />
+        </section>
+
+        {/* Profile Picture Section */}
+        <section className="bg-bg-surface border border-border rounded p-8 space-y-4">
+          <h2 className="text-lg font-serif text-text-primary flex items-center gap-2">
+            <User size={20} />
+            Profile Picture
+          </h2>
+          <p className="text-sm text-text-secondary">
+            Upload your profile picture to use in your CV. If you don't upload one, a placeholder will be used when generating CVs.
+          </p>
+          
+          <div className="flex items-start gap-6">
+            {/* Profile image preview or upload area */}
+            <div className="flex-shrink-0">
+              {profileImage.exists && profileImage.url ? (
+                <div className="relative">
+                  <img
+                    src={profileImage.url}
+                    alt="Profile"
+                    className="w-32 h-32 rounded-sm object-cover border border-border"
+                  />
+                  <button
+                    onClick={handleProfileImageDelete}
+                    className="absolute -top-2 -right-2 bg-red-500 text-white p-1 rounded-full hover:bg-red-600 transition-colors"
+                    title="Delete profile picture"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+              ) : (
+                <div
+                  onClick={() => fileInputRef.current?.click()}
+                  className="w-32 h-32 border-2 border-dashed border-border rounded-sm flex flex-col items-center justify-center cursor-pointer hover:border-accent hover:bg-bg-base transition-colors"
+                >
+                  {uploadingProfile ? (
+                    <Loader2 className="animate-spin text-text-secondary" size={24} />
+                  ) : (
+                    <>
+                      <Upload className="text-text-secondary mb-2" size={24} />
+                      <span className="text-xs text-text-secondary">Upload</span>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+            
+            {/* Upload controls */}
+            <div className="flex-1 space-y-3">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                onChange={handleProfileImageUpload}
+                className="hidden"
+              />
+              
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploadingProfile}
+                className="flex items-center gap-2 text-sm bg-bg-base border border-border px-4 py-2 rounded-sm hover:border-accent hover:text-accent transition-colors disabled:opacity-50"
+              >
+                <Upload size={16} />
+                {uploadingProfile ? 'Uploading...' : 'Choose Image'}
+              </button>
+              
+              <p className="text-xs text-text-secondary">
+                Accepted formats: JPG, PNG, WebP. Maximum size: 5MB.
+              </p>
+              
+              {!profileImage.exists && (
+                <p className="text-sm text-amber-600">
+                  No profile picture uploaded. A placeholder will be used in generated CVs.
+                </p>
+              )}
+            </div>
+          </div>
         </section>
 
         {/* Certificates Section - New Design */}
@@ -329,7 +482,7 @@ export function Settings() {
                  rows={10}
                  value={context['certificates.md']}
                  onChange={e => setContext({...context, 'certificates.md': e.target.value})}
-                 className="w-full bg-bg-base border border-border rounded-sm p-4 text-text-primary focus:outline-none focus:border-accent transition-colors font-mono text-xs whitespace-pre-wrap resize-y"
+                 className="w-full bg-bg-base border border-border rounded-sm p-4 text-text-primary focus:outline-none focus:border-accent transition-colors font-mono whitespace-pre-wrap resize-y"
                  spellCheck={false}
                />
               
@@ -402,7 +555,7 @@ export function Settings() {
             rows={8}
             value={context['instructions.md']}
             onChange={e => setContext({...context, 'instructions.md': e.target.value})}
-            className="w-full bg-bg-base border border-border rounded-sm p-4 text-text-primary focus:outline-none focus:border-accent transition-colors font-mono text-xs whitespace-pre-wrap resize-y"
+            className="w-full bg-bg-base border border-border rounded-sm p-4 text-text-primary focus:outline-none focus:border-accent transition-colors font-mono whitespace-pre-wrap resize-y"
             spellCheck={false}
           />
         </section>

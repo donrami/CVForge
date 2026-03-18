@@ -4,8 +4,10 @@ import { requireAuth } from './routes.js';
 import { upload, handleUploadError } from './middleware/upload.js';
 import { extractCertificateFromPDFPath } from './services/certificate-extractor.js';
 import { cleanupFile } from './services/pdf-extractor.js';
-import fs from 'fs';
+import fs from 'fs/promises';
 import path from 'path';
+import { z } from 'zod';
+import { logger } from './services/logger.js';
 
 export const certificateRouter = Router();
 
@@ -26,12 +28,10 @@ certificateRouter.post(
       const results = [];
 
       for (const file of files) {
-        console.log(`[Certificates] Processing file: ${file.originalname}, size: ${file.size} bytes`);
+        logger.info({ filename: file.originalname, size: file.size }, 'Processing certificate file');
         try {
-          // Extract certificate data directly from PDF using Gemini Vision
-          console.log(`[Certificates] Starting Gemini Vision extraction for: ${file.originalname}`);
           const certificate = await extractCertificateFromPDFPath(file.path);
-          console.log(`[Certificates] Extraction complete. Found: ${certificate ? 'Yes' : 'No'}`);
+          logger.info({ filename: file.originalname, found: !!certificate }, 'Extraction complete');
 
           results.push({
             filename: file.originalname,
@@ -39,12 +39,9 @@ certificateRouter.post(
             certificate: certificate,
           });
 
-          // Cleanup uploaded file
           cleanupFile(file.path);
-          console.log(`[Certificates] Successfully processed: ${file.originalname}`);
         } catch (error: any) {
-          console.error(`[Certificates] Failed to process ${file.originalname}:`, error.message);
-          console.error(`[Certificates] Error stack:`, error.stack);
+          logger.error({ filename: file.originalname, err: error }, 'Failed to process certificate');
           results.push({
             filename: file.originalname,
             error: error.message,
@@ -56,8 +53,8 @@ certificateRouter.post(
 
       return res.json({ results });
     } catch (error: any) {
-      console.error('Certificate extraction error:', error);
-      return res.status(500).json({ error: error.message });
+      logger.error({ err: error }, 'Certificate extraction error');
+      return res.status(500).json({ error: 'Certificate extraction failed' });
     }
   }
 );
@@ -70,69 +67,72 @@ certificateRouter.get('/certificates', requireAuth, async (_req, res) => {
     });
     return res.json({ certificates });
   } catch (error: any) {
-    return res.status(500).json({ error: error.message });
+    logger.error({ err: error }, 'Failed to fetch certificates');
+    return res.status(500).json({ error: 'Failed to fetch certificates' });
   }
 });
 
 // Create a new certificate
-interface CreateCertificateBody {
-  name: string;
-  issuer: string;
-  issueDate?: string;
-  expiryDate?: string;
-  credentialId?: string;
-  skills?: string[];
-  description?: string;
-  sourceFile?: string;
-}
+const createCertificateSchema = z.object({
+  name: z.string().min(1),
+  issuer: z.string().min(1),
+  issueDate: z.string().optional(),
+  expiryDate: z.string().optional(),
+  credentialId: z.string().optional(),
+  skills: z.array(z.string()).optional(),
+  description: z.string().optional(),
+  sourceFile: z.string().optional(),
+}).strict();
 
 certificateRouter.post('/certificates', requireAuth, async (req, res) => {
   try {
-    const data = req.body as CreateCertificateBody;
+    const parsed = createCertificateSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: 'Invalid fields', details: parsed.error.flatten() });
+    }
     
     const certificate = await prisma.certificate.create({
       data: {
-        name: data.name,
-        issuer: data.issuer,
-        issueDate: data.issueDate,
-        expiryDate: data.expiryDate,
-        credentialId: data.credentialId,
-        skills: data.skills || [],
-        description: data.description,
-        sourceFile: data.sourceFile,
+        ...parsed.data,
+        skills: parsed.data.skills || [],
       },
     });
 
     return res.json(certificate);
   } catch (error: any) {
-    return res.status(500).json({ error: error.message });
+    logger.error({ err: error }, 'Failed to create certificate');
+    return res.status(500).json({ error: 'Failed to create certificate' });
   }
 });
 
 // Update a certificate
-interface UpdateCertificateBody {
-  name?: string;
-  issuer?: string;
-  issueDate?: string;
-  expiryDate?: string;
-  credentialId?: string;
-  skills?: string[];
-  description?: string;
-  verified?: boolean;
-}
+const updateCertificateSchema = z.object({
+  name: z.string().min(1).optional(),
+  issuer: z.string().min(1).optional(),
+  issueDate: z.string().optional(),
+  expiryDate: z.string().optional(),
+  credentialId: z.string().optional(),
+  skills: z.array(z.string()).optional(),
+  description: z.string().optional(),
+  verified: z.boolean().optional(),
+}).strict();
 
 certificateRouter.patch('/certificates/:id', requireAuth, async (req, res) => {
   try {
-    const data = req.body as UpdateCertificateBody;
+    const parsed = updateCertificateSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: 'Invalid fields', details: parsed.error.flatten() });
+    }
     
     const certificate = await prisma.certificate.update({
       where: { id: req.params.id },
-      data,
+      data: parsed.data,
     });
 
     return res.json(certificate);
   } catch (error: any) {
-    return res.status(500).json({ error: error.message });
+    logger.error({ err: error }, 'Failed to update certificate');
+    return res.status(500).json({ error: 'Failed to update certificate' });
   }
 });
 
@@ -145,53 +145,32 @@ certificateRouter.delete('/certificates/:id', requireAuth, async (req, res) => {
 
     return res.json({ success: true });
   } catch (error: any) {
-    return res.status(500).json({ error: error.message });
+    logger.error({ err: error }, 'Failed to delete certificate');
+    return res.status(500).json({ error: 'Failed to delete certificate' });
   }
 });
 
 // Sync certificates to context file (certificates.md)
 certificateRouter.post('/certificates/sync-to-context', requireAuth, async (_req, res) => {
   try {
-    console.log('[Certificates Sync] Starting sync to context...');
-    
     const certificates = await prisma.certificate.findMany({
       orderBy: { issueDate: 'desc' },
     });
-    console.log(`[Certificates Sync] Found ${certificates.length} certificates in database`);
+    logger.info({ count: certificates.length }, 'Syncing certificates to context');
 
-    // Generate markdown content
     const markdown = generateCertificatesMarkdown(certificates);
-    console.log(`[Certificates Sync] Generated markdown (${markdown.length} chars)`);
-    console.log('[Certificates Sync] Markdown preview:', markdown.substring(0, 200) + '...');
 
-    // Write to context file
     const contextDir = path.join(process.cwd(), 'context');
-    console.log(`[Certificates Sync] Context directory: ${contextDir}`);
-    
-    if (!fs.existsSync(contextDir)) {
-      console.log('[Certificates Sync] Creating context directory...');
-      fs.mkdirSync(contextDir, { recursive: true });
-    } else {
-      console.log('[Certificates Sync] Context directory already exists');
-    }
+    await fs.mkdir(contextDir, { recursive: true });
 
     const filePath = path.join(contextDir, 'certificates.md');
-    console.log(`[Certificates Sync] Writing to: ${filePath}`);
-    
-    fs.writeFileSync(filePath, markdown);
-    
-    // Verify file was written
-    if (fs.existsSync(filePath)) {
-      const stats = fs.statSync(filePath);
-      console.log(`[Certificates Sync] File written successfully. Size: ${stats.size} bytes`);
-    } else {
-      console.error('[Certificates Sync] ERROR: File was not created!');
-    }
+    await fs.writeFile(filePath, markdown);
+    logger.info({ path: filePath, size: markdown.length }, 'Certificates context file written');
 
     return res.json({ success: true, certificateCount: certificates.length });
   } catch (error: any) {
-    console.error('[Certificates Sync] ERROR:', error);
-    return res.status(500).json({ error: error.message });
+    logger.error({ err: error }, 'Failed to sync certificates to context');
+    return res.status(500).json({ error: 'Failed to sync certificates' });
   }
 });
 

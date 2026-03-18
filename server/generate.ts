@@ -1,8 +1,11 @@
 import { Router } from 'express';
 import { prisma, ai } from '../server.js';
 import { requireAuth } from './routes.js';
-import fs from 'fs';
+import fs from 'fs/promises';
 import path from 'path';
+import { stripDangerousLatex } from './services/latex-sanitizer.js';
+import { logger } from './services/logger.js';
+import { prepareProfileImage } from './services/profile-image.js';
 
 export const generateRouter = Router();
 
@@ -17,8 +20,14 @@ ABSOLUTE RULES:
 - Never exaggerate or stretch facts beyond reasonable professional framing
 - Never use AI-generated filler phrases: "passionate about", "results-driven", "dynamic", "leverage", "spearhead", "synergy", "fast-paced environment", or similar
 - Output only valid, compilable LaTeX — no markdown, no explanation, no preamble text
-- Preserve the LaTeX document class and preamble structure from the master CV exactly
-- Only modify content sections, never structural/layout commands unless strictly necessary
+- CRITICAL: Preserve the ENTIRE document structure from the master CV EXACTLY:
+  * Keep the same document class (article, scrlttr2, etc.)
+  * Keep ALL packages and preamble commands
+  * Keep the same section headings (\section{...}) in the SAME ORDER
+  * Keep the same column layout (paracol, minipage, etc.)
+  * Keep the same formatting (titleformat, colors, fonts, etc.)
+  * NEVER add, remove, or reorder sections - only modify their content
+- Only modify the text content within each section - never change the LaTeX markup
 
 GERMAN CV RULES (apply only when target language is DE):
 - Use formal "Sie" register throughout
@@ -53,15 +62,22 @@ Your task is to:
 2. Identify any AI-sounding language
 3. Identify any factual inventions or stretches not supported by the original context
 4. Identify any LaTeX syntax issues
-5. Rewrite the CV fixing all identified issues
+5. Identify any changes to the document structure (sections, columns, formatting) that don't match the master CV
+6. Rewrite the CV fixing all identified issues
 
 RULES TO CHECK:
 - Never invent facts, skills, technologies, dates, or achievements not present in the source documents
 - Never exaggerate or stretch facts beyond reasonable professional framing
 - Never use AI-generated filler phrases: "passionate about", "results-driven", "dynamic", "leverage", "spearhead", "synergy", "fast-paced environment", or similar
 - Output only valid, compilable LaTeX — no markdown, no explanation, no preamble text
-- Preserve the LaTeX document class and preamble structure from the master CV exactly
-- Only modify content sections, never structural/layout commands unless strictly necessary
+- CRITICAL: Preserve the ENTIRE document structure from the master CV EXACTLY:
+  * Keep the same document class
+  * Keep ALL packages and preamble commands
+  * Keep the same section headings in the SAME ORDER
+  * Keep the same column layout
+  * Keep the same formatting
+  * NEVER add, remove, or reorder sections
+- Only modify the text content within each section - never change the LaTeX markup
 
 OUTPUT FORMAT:
 First output a CRITIQUE section (plain text) listing all issues found.
@@ -75,7 +91,7 @@ Answer each question with YES or NO and a one-line explanation:
 
 1. Does the CV contain any invented facts not present in the source context?
 2. Does the CV contain any AI-sounding filler phrases?
-3. [If German] Does the CV follow all German CV writing conventions?
+3. Does the CV preserve the EXACT same document structure as the master CV (sections in same order, same columns, same formatting)?
 4. Does the LaTeX appear structurally valid (matching braces, no obvious compile errors)?
 5. Is the CV well-tailored to the job description, or is it generic?
 
@@ -99,9 +115,13 @@ const handleGenerate = async (req: any, res: any) => {
   try {
     sendEvent('step', { message: 'Assembling context...' });
     const contextDir = path.join(process.cwd(), 'context');
-    const masterCv = fs.existsSync(path.join(contextDir, 'master-cv.tex')) ? fs.readFileSync(path.join(contextDir, 'master-cv.tex'), 'utf-8') : '';
-    const certs = fs.existsSync(path.join(contextDir, 'certificates.md')) ? fs.readFileSync(path.join(contextDir, 'certificates.md'), 'utf-8') : '';
-    const instructions = fs.existsSync(path.join(contextDir, 'instructions.md')) ? fs.readFileSync(path.join(contextDir, 'instructions.md'), 'utf-8') : '';
+    
+    const readContextFile = async (name: string) => {
+      try { return await fs.readFile(path.join(contextDir, name), 'utf-8'); } catch { return ''; }
+    };
+    const masterCv = await readContextFile('master-cv.tex');
+    const certs = await readContextFile('certificates.md');
+    const instructions = await readContextFile('instructions.md');
 
     const fullContext = `
 MASTER CV:
@@ -173,6 +193,13 @@ ADDITIONAL CONTEXT: ${additionalContext || 'None'}
     
     generationLog.push({ pass: maxIterations + 1, critique: validationCritique, output: currentLatex });
 
+    // Sanitize AI-generated LaTeX before saving
+    const sanitizeResult = stripDangerousLatex(currentLatex);
+    if (!sanitizeResult.safe) {
+      logger.warn({ violations: sanitizeResult.violations }, 'Stripped dangerous LaTeX commands from AI output');
+    }
+    currentLatex = sanitizeResult.sanitized;
+
     sendEvent('step', { message: 'Saving application...' });
     
     const app = await prisma.application.create({
@@ -190,14 +217,17 @@ ADDITIONAL CONTEXT: ${additionalContext || 'None'}
     });
 
     const genDir = path.join(process.cwd(), 'generated', app.id);
-    if (!fs.existsSync(genDir)) fs.mkdirSync(genDir, { recursive: true });
-    fs.writeFileSync(path.join(genDir, 'cv.tex'), currentLatex);
+    await fs.mkdir(genDir, { recursive: true });
+    
+    // Handle profile image and write final LaTeX
+    currentLatex = await prepareProfileImage(currentLatex, genDir);
+    await fs.writeFile(path.join(genDir, 'cv.tex'), currentLatex);
 
     sendEvent('complete', { applicationId: app.id });
     res.end();
 
   } catch (e: any) {
-    console.error(e);
+    logger.error({ err: e }, 'Generation pipeline failed');
     sendEvent('error', { message: e.message });
     res.end();
   }

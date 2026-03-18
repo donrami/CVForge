@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { FileText, Plus, Search, Filter, MoreVertical, Download, RefreshCw, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useDialog } from '../context/DialogContext';
+import { EmptyState } from '../components/EmptyState';
 
 interface Application {
   id: string;
@@ -18,6 +19,8 @@ export function Dashboard() {
   const [apps, setApps] = useState<Application[]>([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
+  const [searchParams] = useSearchParams();
+  const highlightedId = searchParams.get('highlighted');
   const { confirm, toast } = useDialog();
 
   useEffect(() => {
@@ -28,6 +31,16 @@ export function Dashboard() {
         setLoading(false);
       });
   }, []);
+
+  // Clear the highlighted parameter after first render
+  useEffect(() => {
+    if (highlightedId) {
+      const timer = setTimeout(() => {
+        window.history.replaceState({}, '', '/');
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [highlightedId]);
 
   const filteredApps = apps.filter(app =>
     app.companyName.toLowerCase().includes(search.toLowerCase()) ||
@@ -107,9 +120,16 @@ export function Dashboard() {
             {loading ? (
               <tr><td colSpan={6} className="p-8 text-center text-text-secondary">Loading...</td></tr>
             ) : filteredApps.length === 0 ? (
-              <tr><td colSpan={6} className="p-8 text-center text-text-secondary">No applications found.</td></tr>
+              <tr><td colSpan={6}><EmptyState message="No applications found." /></td></tr>
             ) : filteredApps.map(app => (
-              <tr key={app.id} className="hover:bg-bg-elevated transition-colors group">
+              <tr 
+                key={app.id} 
+                className={`hover:bg-bg-elevated transition-colors group ${
+                  highlightedId === app.id 
+                    ? 'flash-highlight' 
+                    : ''
+                }`}
+              >
                 <td className="p-4 font-medium text-text-primary">
                   <Link to={`/applications/${app.id}`} className="hover:text-accent transition-colors">
                     {app.companyName}

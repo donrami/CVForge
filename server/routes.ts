@@ -3,12 +3,32 @@ import { prisma, ai } from '../server.js';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { z } from 'zod';
-import fs from 'fs';
+import fs from 'fs/promises';
+import fsSync from 'fs';
 import path from 'path';
-import { exec } from 'child_process';
+import { execFile } from 'child_process';
 import util from 'util';
+import { assertSafeLatex } from './services/latex-sanitizer.js';
+import { logger } from './services/logger.js';
+import { prepareProfileImage } from './services/profile-image.js';
 
-const execAsync = util.promisify(exec);
+const execFileAsync = util.promisify(execFile);
+
+/** Sanitize a string for use in Content-Disposition filename */
+function safeFilename(name: string): string {
+  return name.replace(/[^a-zA-Z0-9_\-. ]/g, '').replace(/\s+/g, '_') || 'download';
+}
+
+/** Return a safe error response — hide internals in production */
+function errorResponse(res: any, status: number, error: unknown, code?: string) {
+  const message = error instanceof Error ? error.message : String(error);
+  if (process.env.NODE_ENV === 'production') {
+    logger.error({ err: error, code }, 'Request error');
+    return res.status(status).json({ error: 'Internal server error', ...(code && { code }) });
+  }
+  logger.error({ err: error, code }, message);
+  return res.status(status).json({ error: message, ...(code && { code }) });
+}
 
 export const apiRouter = Router();
 
@@ -43,7 +63,12 @@ apiRouter.post('/auth/login', async (req, res) => {
   if (!isValid) return res.status(401).json({ error: 'Invalid password' });
 
   const token = jwt.sign({ authenticated: true }, JWT_SECRET, { expiresIn: '7d' });
-  res.cookie('token', token, { httpOnly: true, secure: process.env.NODE_ENV === 'production', maxAge: 7 * 24 * 60 * 60 * 1000 });
+  res.cookie('token', token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'strict',
+    maxAge: 7 * 24 * 60 * 60 * 1000,
+  });
   res.json({ success: true });
 });
 
@@ -66,13 +91,21 @@ apiRouter.get('/auth/session', (req, res) => {
 // Applications Routes
 apiRouter.get('/applications', requireAuth, async (req, res) => {
   try {
-    const apps = await prisma.application.findMany({
-      where: { deletedAt: null },
-      orderBy: { createdAt: 'desc' },
-    });
-    res.json({ applications: apps });
-  } catch (e: any) {
-    res.status(500).json({ error: e.message, code: 'DATABASE_ERROR' });
+    const skip = Math.max(0, parseInt(req.query.skip as string) || 0);
+    const take = Math.min(100, Math.max(1, parseInt(req.query.take as string) || 50));
+
+    const [applications, total] = await Promise.all([
+      prisma.application.findMany({
+        where: { deletedAt: null },
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take,
+      }),
+      prisma.application.count({ where: { deletedAt: null } }),
+    ]);
+    res.json({ applications, total, skip, take });
+  } catch (e) {
+    errorResponse(res, 500, e, 'DATABASE_ERROR');
   }
 });
 
@@ -84,20 +117,34 @@ apiRouter.get('/applications/:id', requireAuth, async (req, res) => {
     });
     if (!app) return res.status(404).json({ error: 'Not found', code: 'NOT_FOUND' });
     res.json(app);
-  } catch (e: any) {
-    res.status(500).json({ error: e.message, code: 'DATABASE_ERROR' });
+  } catch (e) {
+    errorResponse(res, 500, e, 'DATABASE_ERROR');
   }
 });
 
+// Whitelist of fields allowed in PATCH updates
+const applicationUpdateSchema = z.object({
+  status: z.enum(['GENERATED', 'APPLIED', 'INTERVIEW', 'OFFER', 'REJECTED', 'WITHDRAWN']).optional(),
+  notes: z.string().nullable().optional(),
+  appliedAt: z.string().datetime().nullable().optional(),
+  interviewAt: z.string().datetime().nullable().optional(),
+  offerAt: z.string().datetime().nullable().optional(),
+  rejectedAt: z.string().datetime().nullable().optional(),
+}).strict();
+
 apiRouter.patch('/applications/:id', requireAuth, async (req, res) => {
   try {
+    const parsed = applicationUpdateSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: 'Invalid fields', details: parsed.error.flatten() });
+    }
     const app = await prisma.application.update({
       where: { id: req.params.id },
-      data: req.body
+      data: parsed.data
     });
     res.json(app);
-  } catch (e: any) {
-    res.status(500).json({ error: e.message });
+  } catch (e) {
+    errorResponse(res, 500, e);
   }
 });
 
@@ -108,8 +155,8 @@ apiRouter.delete('/applications/:id', requireAuth, async (req, res) => {
       data: { deletedAt: new Date() }
     });
     res.json({ success: true });
-  } catch (e: any) {
-    res.status(500).json({ error: e.message, code: 'DATABASE_ERROR' });
+  } catch (e) {
+    errorResponse(res, 500, e, 'DATABASE_ERROR');
   }
 });
 
@@ -119,10 +166,10 @@ apiRouter.get('/applications/:id/download/tex', requireAuth, async (req, res) =>
     if (!app) return res.status(404).json({ error: 'Not found', code: 'NOT_FOUND' });
     
     res.setHeader('Content-Type', 'application/x-tex');
-    res.setHeader('Content-Disposition', `attachment; filename="${app.companyName.replace(/\s+/g, '_')}_CV.tex"`);
+    res.setHeader('Content-Disposition', `attachment; filename="${safeFilename(app.companyName)}_CV.tex"`);
     res.send(app.latexOutput);
-  } catch (e: any) {
-    res.status(500).json({ error: e.message });
+  } catch (e) {
+    errorResponse(res, 500, e);
   }
 });
 
@@ -135,35 +182,93 @@ apiRouter.get('/applications/:id/download/pdf', requireAuth, async (req, res) =>
     const pdfPath = path.join(genDir, 'cv.pdf');
     const texPath = path.join(genDir, 'cv.tex');
     
-    if (!fs.existsSync(genDir)) fs.mkdirSync(genDir, { recursive: true });
-    if (!fs.existsSync(texPath)) fs.writeFileSync(texPath, app.latexOutput);
+    await fs.mkdir(genDir, { recursive: true });
+    
+    // Check if LaTeX file exists, if not create it with profile image handling
+    let texExists = false;
+    try { await fs.access(texPath); texExists = true; } catch {}
 
-    if (!app.pdfGenerated || !fs.existsSync(pdfPath)) {
+    if (!texExists) {
+      let latexContent = app.latexOutput;
+      
+      // Handle profile image and placeholders
+      latexContent = await prepareProfileImage(latexContent, genDir);
+      
+      // Sanitize before writing to disk
+      assertSafeLatex(latexContent);
+      await fs.writeFile(texPath, latexContent);
+    }
+
+    let pdfExists = false;
+    try { await fs.access(pdfPath); pdfExists = true; } catch {}
+
+    if (!app.pdfGenerated || !pdfExists) {
+      let lastError: any = null;
+      const compileTimeout = 30_000; // 30 seconds
+      
       try {
-        await execAsync(`pdflatex -interaction=nonstopmode -output-directory="${genDir}" "${texPath}"`);
+        await execFileAsync('lualatex', [
+          '--no-shell-escape',
+          '-interaction=nonstopmode',
+          `-output-directory=${genDir}`,
+          texPath,
+        ], { timeout: compileTimeout });
         await prisma.application.update({ where: { id: app.id }, data: { pdfGenerated: true } });
       } catch (e: any) {
-        return res.status(500).json({ error: 'LaTeX compilation failed', details: e.stdout || e.message });
+        lastError = e;
+        
+        const errorOutput = e.stdout || e.message || '';
+        const needsPdflatex = errorOutput.includes('fontspec') && 
+          (errorOutput.includes('XeTeX') || errorOutput.includes('LuaTeX') || errorOutput.includes('xelatex') || errorOutput.includes('lualatex'));
+        
+        if (needsPdflatex) {
+          logger.info('lualatex failed, trying pdflatex as fallback...');
+          try {
+            await execFileAsync('pdflatex', [
+              '--no-shell-escape',
+              '-interaction=nonstopmode',
+              `-output-directory=${genDir}`,
+              texPath,
+            ], { timeout: compileTimeout });
+            await prisma.application.update({ where: { id: app.id }, data: { pdfGenerated: true } });
+            lastError = null;
+          } catch (pdflatexError: any) {
+            lastError = pdflatexError;
+          }
+        }
+      }
+      
+      if (lastError) {
+        const errorDetails = lastError.stdout || lastError.message || '';
+        logger.error({ err: lastError }, 'LaTeX compilation failed');
+        
+        let userMessage = 'LaTeX compilation failed.';
+        const errorLines = errorDetails.split('\n').filter((line: string) => line.trim().startsWith('!') || line.includes('Error'));
+        if (errorLines.length > 0) {
+          userMessage = errorLines.slice(0, 3).join(' ').substring(0, 500);
+        }
+        
+        return res.status(500).json({ error: userMessage });
       }
     }
     
     res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename="${app.companyName.replace(/\s+/g, '_')}_CV.pdf"`);
+    res.setHeader('Content-Disposition', `attachment; filename="${safeFilename(app.companyName)}_CV.pdf"`);
     res.sendFile(pdfPath);
-  } catch (e: any) {
-    res.status(500).json({ error: e.message });
+  } catch (e) {
+    errorResponse(res, 500, e);
   }
 });
 
 // Context Settings
-apiRouter.get('/settings/context', requireAuth, (req, res) => {
+apiRouter.get('/settings/context', requireAuth, async (req, res) => {
   const contextDir = path.join(process.cwd(), 'context');
   const files = ['master-cv.tex', 'certificates.md', 'instructions.md'];
   const result: Record<string, string> = {};
   
   for (const file of files) {
     try {
-      result[file] = fs.readFileSync(path.join(contextDir, file), 'utf-8');
+      result[file] = await fs.readFile(path.join(contextDir, file), 'utf-8');
     } catch (e) {
       result[file] = '';
     }
@@ -171,15 +276,117 @@ apiRouter.get('/settings/context', requireAuth, (req, res) => {
   res.json(result);
 });
 
-apiRouter.post('/settings/context', requireAuth, (req, res) => {
+apiRouter.post('/settings/context', requireAuth, async (req, res) => {
   const contextDir = path.join(process.cwd(), 'context');
-  if (!fs.existsSync(contextDir)) fs.mkdirSync(contextDir, { recursive: true });
+  await fs.mkdir(contextDir, { recursive: true });
   
   const { 'master-cv.tex': masterCv, 'certificates.md': certs, 'instructions.md': instructions } = req.body;
   
-  if (masterCv !== undefined) fs.writeFileSync(path.join(contextDir, 'master-cv.tex'), masterCv);
-  if (certs !== undefined) fs.writeFileSync(path.join(contextDir, 'certificates.md'), certs);
-  if (instructions !== undefined) fs.writeFileSync(path.join(contextDir, 'instructions.md'), instructions);
+  if (masterCv !== undefined) await fs.writeFile(path.join(contextDir, 'master-cv.tex'), masterCv);
+  if (certs !== undefined) await fs.writeFile(path.join(contextDir, 'certificates.md'), certs);
+  if (instructions !== undefined) await fs.writeFile(path.join(contextDir, 'instructions.md'), instructions);
   
   res.json({ success: true });
+});
+
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Profile Image Management - use __dirname for consistent path
+const profileImageDir = path.join(__dirname, '..', 'uploads', 'profile');
+if (!fsSync.existsSync(profileImageDir)) {
+  fsSync.mkdirSync(profileImageDir, { recursive: true });
+}
+
+// Multer configuration for profile images
+import multer from 'multer';
+
+const profileStorage = multer.diskStorage({
+  destination: (_req, _file, cb) => {
+    cb(null, profileImageDir);
+  },
+  filename: (_req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase();
+    cb(null, `profile${ext}`);
+  },
+});
+
+const profileFileFilter = (_req: any, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
+  const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
+  if (allowedTypes.includes(file.mimetype)) {
+    cb(null, true);
+  } else {
+    cb(new Error('Only JPG, PNG, and WebP images are allowed'));
+  }
+};
+
+const profileUpload = multer({
+  storage: profileStorage,
+  fileFilter: profileFileFilter,
+  limits: {
+    fileSize: 5 * 1024 * 1024, // 5MB max
+  },
+});
+
+// Get profile image info
+apiRouter.get('/settings/profile-image', requireAuth, async (_req, res) => {
+  const files = await fs.readdir(profileImageDir);
+  const imageFiles = files.filter(f => /\.(jpg|jpeg|png|webp)$/i.test(f));
+  
+  if (imageFiles.length > 0) {
+    const filename = imageFiles[0];
+    const filePath = path.join(profileImageDir, filename);
+    const stats = await fs.stat(filePath);
+    res.json({
+      exists: true,
+      filename,
+      url: `/uploads/profile/${filename}`,
+      size: stats.size,
+      uploadedAt: stats.mtime,
+    });
+  } else {
+    res.json({ exists: false });
+  }
+});
+
+// Upload profile image
+apiRouter.post('/settings/profile-image', requireAuth, profileUpload.single('profileImage'), async (req, res) => {
+  try {
+    // Remove old profile images
+    const files = await fs.readdir(profileImageDir);
+    for (const file of files) {
+      if (/\.(jpg|jpeg|png|webp)$/i.test(file)) {
+        await fs.unlink(path.join(profileImageDir, file));
+      }
+    }
+    
+    if (!req.file) {
+      return res.status(400).json({ error: 'No image uploaded' });
+    }
+    
+    res.json({
+      success: true,
+      filename: req.file.filename,
+      url: `/uploads/profile/${req.file.filename}`,
+    });
+  } catch (e) {
+    errorResponse(res, 500, e);
+  }
+});
+
+// Delete profile image
+apiRouter.delete('/settings/profile-image', requireAuth, async (_req, res) => {
+  try {
+    const files = await fs.readdir(profileImageDir);
+    for (const file of files) {
+      if (/\.(jpg|jpeg|png|webp)$/i.test(file)) {
+        await fs.unlink(path.join(profileImageDir, file));
+      }
+    }
+    res.json({ success: true });
+  } catch (e) {
+    errorResponse(res, 500, e);
+  }
 });
