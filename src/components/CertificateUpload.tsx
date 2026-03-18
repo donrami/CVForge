@@ -8,6 +8,7 @@ interface ExtractedCertificate {
   expiryDate?: string;
   credentialId?: string;
   skills: string[];
+  activities: string[];
   description?: string;
   confidence: number;
 }

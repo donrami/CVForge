@@ -76,27 +76,35 @@ certificateRouter.get('/certificates', requireAuth, async (_req, res) => {
 const createCertificateSchema = z.object({
   name: z.string().min(1),
   issuer: z.string().min(1),
-  issueDate: z.string().optional(),
-  expiryDate: z.string().optional(),
-  credentialId: z.string().optional(),
+  issueDate: z.string().optional().nullable(),
+  expiryDate: z.string().optional().nullable(),
+  credentialId: z.string().optional().nullable(),
   skills: z.array(z.string()).optional(),
-  description: z.string().optional(),
+  activities: z.array(z.string()).optional(),
+  description: z.string().optional().nullable(),
   sourceFile: z.string().optional(),
-}).strict();
+}).strip();
 
 certificateRouter.post('/certificates', requireAuth, async (req, res) => {
   try {
     const parsed = createCertificateSchema.safeParse(req.body);
     if (!parsed.success) {
+      logger.warn({ body: req.body, errors: parsed.error.flatten() }, 'Certificate validation failed');
       return res.status(400).json({ error: 'Invalid fields', details: parsed.error.flatten() });
     }
     
-    const certificate = await prisma.certificate.create({
-      data: {
-        ...parsed.data,
-        skills: parsed.data.skills || [],
-      },
-    });
+    // Convert null optional strings to undefined for Prisma
+    const data = {
+      ...parsed.data,
+      skills: parsed.data.skills || [],
+      activities: parsed.data.activities || [],
+      issueDate: parsed.data.issueDate ?? undefined,
+      expiryDate: parsed.data.expiryDate ?? undefined,
+      credentialId: parsed.data.credentialId ?? undefined,
+      description: parsed.data.description ?? undefined,
+    };
+    
+    const certificate = await prisma.certificate.create({ data });
 
     return res.json(certificate);
   } catch (error: any) {
@@ -109,13 +117,14 @@ certificateRouter.post('/certificates', requireAuth, async (req, res) => {
 const updateCertificateSchema = z.object({
   name: z.string().min(1).optional(),
   issuer: z.string().min(1).optional(),
-  issueDate: z.string().optional(),
-  expiryDate: z.string().optional(),
-  credentialId: z.string().optional(),
+  issueDate: z.string().optional().nullable(),
+  expiryDate: z.string().optional().nullable(),
+  credentialId: z.string().optional().nullable(),
   skills: z.array(z.string()).optional(),
-  description: z.string().optional(),
+  activities: z.array(z.string()).optional(),
+  description: z.string().optional().nullable(),
   verified: z.boolean().optional(),
-}).strict();
+}).strip();
 
 certificateRouter.patch('/certificates/:id', requireAuth, async (req, res) => {
   try {
@@ -243,6 +252,7 @@ function generateCertificatesMarkdown(certificates: any[]): string {
   markdown += '2. Add a "Certifications" section if not present in the master CV\n';
   markdown += '3. Highlight certifications that match job requirements\n';
   markdown += '4. Never claim certifications not listed here\n';
+  markdown += '5. For work certificates with listed activities, use those activities to enrich the work experience section with concrete, factual responsibilities\n';
 
   return markdown;
 }
@@ -266,6 +276,13 @@ function formatCertificateEntry(cert: any): string {
   
   if (cert.description) {
     entry += `  - ${cert.description}\n`;
+  }
+
+  if (cert.activities && cert.activities.length > 0) {
+    entry += `  - Key activities:\n`;
+    for (const activity of cert.activities) {
+      entry += `    - ${activity}\n`;
+    }
   }
   
   if (cert.credentialId) {

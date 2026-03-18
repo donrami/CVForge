@@ -71,6 +71,7 @@ model Certificate {
   expiryDate       String?  // For certifications that expire
   credentialId     String?  // Certificate/license number
   skills           String[] // Skills covered (PostgreSQL array)
+  activities       String[] // Work activities/responsibilities (for work certificates)
   description      String?  @db.Text
 
   // Source tracking

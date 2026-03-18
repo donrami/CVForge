@@ -1,14 +1,12 @@
 import { Router } from 'express';
 import { prisma, ai } from '../server.js';
-import bcrypt from 'bcryptjs';
-import jwt from 'jsonwebtoken';
 import { z } from 'zod';
 import fs from 'fs/promises';
 import fsSync from 'fs';
 import path from 'path';
 import { execFile } from 'child_process';
 import util from 'util';
-import { assertSafeLatex } from './services/latex-sanitizer.js';
+import { assertSafeLatex, escapeLatexSpecialChars } from './services/latex-sanitizer.js';
 import { logger } from './services/logger.js';
 import { prepareProfileImage } from './services/profile-image.js';
 
@@ -32,61 +30,8 @@ function errorResponse(res: any, status: number, error: unknown, code?: string) 
 
 export const apiRouter = Router();
 
-if (!process.env.NEXTAUTH_SECRET) {
-  throw new Error('NEXTAUTH_SECRET environment variable is required');
-}
-if (!process.env.AUTH_PASSWORD_HASH) {
-  throw new Error('AUTH_PASSWORD_HASH environment variable is required');
-}
-
-const JWT_SECRET = process.env.NEXTAUTH_SECRET;
-const AUTH_PASSWORD_HASH = process.env.AUTH_PASSWORD_HASH;
-
-// Auth Middleware
-export const requireAuth = (req: any, res: any, next: any) => {
-  const token = req.cookies.token;
-  if (!token) return res.status(401).json({ error: 'Unauthorized' });
-  try {
-    jwt.verify(token, JWT_SECRET);
-    next();
-  } catch (e) {
-    res.status(401).json({ error: 'Invalid token' });
-  }
-};
-
-// Login Route
-apiRouter.post('/auth/login', async (req, res) => {
-  const { password } = req.body;
-  if (!password) return res.status(400).json({ error: 'Password required' });
-  
-  const isValid = await bcrypt.compare(password, AUTH_PASSWORD_HASH);
-  if (!isValid) return res.status(401).json({ error: 'Invalid password' });
-
-  const token = jwt.sign({ authenticated: true }, JWT_SECRET, { expiresIn: '7d' });
-  res.cookie('token', token, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'strict',
-    maxAge: 7 * 24 * 60 * 60 * 1000,
-  });
-  res.json({ success: true });
-});
-
-apiRouter.post('/auth/logout', (req, res) => {
-  res.clearCookie('token');
-  res.json({ success: true });
-});
-
-apiRouter.get('/auth/session', (req, res) => {
-  const token = req.cookies.token;
-  if (!token) return res.json({ authenticated: false });
-  try {
-    jwt.verify(token, JWT_SECRET);
-    res.json({ authenticated: true });
-  } catch (e) {
-    res.json({ authenticated: false });
-  }
-});
+// No-op auth middleware (app runs locally for a single user)
+export const requireAuth = (_req: any, _res: any, next: any) => next();
 
 // Applications Routes
 apiRouter.get('/applications', requireAuth, async (req, res) => {
@@ -194,6 +139,9 @@ apiRouter.get('/applications/:id/download/pdf', requireAuth, async (req, res) =>
       // Handle profile image and placeholders
       latexContent = await prepareProfileImage(latexContent, genDir);
       
+      // Escape unescaped special characters (e.g. & in text)
+      latexContent = escapeLatexSpecialChars(latexContent);
+      
       // Sanitize before writing to disk
       assertSafeLatex(latexContent);
       await fs.writeFile(texPath, latexContent);
@@ -239,16 +187,25 @@ apiRouter.get('/applications/:id/download/pdf', requireAuth, async (req, res) =>
       }
       
       if (lastError) {
-        const errorDetails = lastError.stdout || lastError.message || '';
-        logger.error({ err: lastError }, 'LaTeX compilation failed');
+        // Check if PDF was produced despite non-zero exit code (non-fatal LaTeX errors)
+        let pdfProduced = false;
+        try { await fs.access(pdfPath); pdfProduced = true; } catch {}
         
-        let userMessage = 'LaTeX compilation failed.';
-        const errorLines = errorDetails.split('\n').filter((line: string) => line.trim().startsWith('!') || line.includes('Error'));
-        if (errorLines.length > 0) {
-          userMessage = errorLines.slice(0, 3).join(' ').substring(0, 500);
+        if (pdfProduced) {
+          logger.warn({ err: lastError }, 'LaTeX had non-fatal errors but PDF was produced');
+          await prisma.application.update({ where: { id: app.id }, data: { pdfGenerated: true } });
+        } else {
+          const errorDetails = lastError.stdout || lastError.message || '';
+          logger.error({ err: lastError }, 'LaTeX compilation failed');
+          
+          let userMessage = 'LaTeX compilation failed.';
+          const errorLines = errorDetails.split('\n').filter((line: string) => line.trim().startsWith('!') || line.includes('Error'));
+          if (errorLines.length > 0) {
+            userMessage = errorLines.slice(0, 3).join(' ').substring(0, 500);
+          }
+          
+          return res.status(500).json({ error: userMessage });
         }
-        
-        return res.status(500).json({ error: userMessage });
       }
     }
     
@@ -263,7 +220,7 @@ apiRouter.get('/applications/:id/download/pdf', requireAuth, async (req, res) =>
 // Context Settings
 apiRouter.get('/settings/context', requireAuth, async (req, res) => {
   const contextDir = path.join(process.cwd(), 'context');
-  const files = ['master-cv.tex', 'certificates.md', 'instructions.md'];
+  const files = ['master-cv.tex', 'certificates.md'];
   const result: Record<string, string> = {};
   
   for (const file of files) {
@@ -280,11 +237,10 @@ apiRouter.post('/settings/context', requireAuth, async (req, res) => {
   const contextDir = path.join(process.cwd(), 'context');
   await fs.mkdir(contextDir, { recursive: true });
   
-  const { 'master-cv.tex': masterCv, 'certificates.md': certs, 'instructions.md': instructions } = req.body;
+  const { 'master-cv.tex': masterCv, 'certificates.md': certs } = req.body;
   
   if (masterCv !== undefined) await fs.writeFile(path.join(contextDir, 'master-cv.tex'), masterCv);
   if (certs !== undefined) await fs.writeFile(path.join(contextDir, 'certificates.md'), certs);
-  if (instructions !== undefined) await fs.writeFile(path.join(contextDir, 'instructions.md'), instructions);
   
   res.json({ success: true });
 });
@@ -354,16 +310,16 @@ apiRouter.get('/settings/profile-image', requireAuth, async (_req, res) => {
 // Upload profile image
 apiRouter.post('/settings/profile-image', requireAuth, profileUpload.single('profileImage'), async (req, res) => {
   try {
-    // Remove old profile images
-    const files = await fs.readdir(profileImageDir);
-    for (const file of files) {
-      if (/\.(jpg|jpeg|png|webp)$/i.test(file)) {
-        await fs.unlink(path.join(profileImageDir, file));
-      }
-    }
-    
     if (!req.file) {
       return res.status(400).json({ error: 'No image uploaded' });
+    }
+
+    // Remove old profile images, but keep the newly uploaded one
+    const files = await fs.readdir(profileImageDir);
+    for (const file of files) {
+      if (/\.(jpg|jpeg|png|webp)$/i.test(file) && file !== req.file.filename) {
+        await fs.unlink(path.join(profileImageDir, file));
+      }
     }
     
     res.json({
@@ -375,6 +331,8 @@ apiRouter.post('/settings/profile-image', requireAuth, profileUpload.single('pro
     errorResponse(res, 500, e);
   }
 });
+
+import { loadAllPrompts, saveAllPrompts, getDefaults, PROMPT_KEYS } from './services/prompts.js';
 
 // Delete profile image
 apiRouter.delete('/settings/profile-image', requireAuth, async (_req, res) => {
@@ -389,4 +347,31 @@ apiRouter.delete('/settings/profile-image', requireAuth, async (_req, res) => {
   } catch (e) {
     errorResponse(res, 500, e);
   }
+});
+
+// Prompt Settings
+apiRouter.get('/settings/prompts', requireAuth, async (_req, res) => {
+  try {
+    const prompts = await loadAllPrompts();
+    res.json(prompts);
+  } catch (e) {
+    errorResponse(res, 500, e);
+  }
+});
+
+apiRouter.post('/settings/prompts', requireAuth, async (req, res) => {
+  try {
+    const data: Record<string, string> = {};
+    for (const key of PROMPT_KEYS) {
+      if (req.body[key] !== undefined) data[key] = req.body[key];
+    }
+    await saveAllPrompts(data);
+    res.json({ success: true });
+  } catch (e) {
+    errorResponse(res, 500, e);
+  }
+});
+
+apiRouter.get('/settings/prompts/defaults', requireAuth, (_req, res) => {
+  res.json(getDefaults());
 });

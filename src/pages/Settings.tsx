@@ -1,16 +1,25 @@
 import { useEffect, useState, useRef } from 'react';
-import { Save, Check, Loader2, Upload, Award, FileText, Trash2, CheckCircle, User, X } from 'lucide-react';
+import { Save, Check, Loader2, Upload, Award, FileText, Trash2, CheckCircle, User, X, ChevronDown, ChevronRight, RotateCcw } from 'lucide-react';
 import { CertificateUpload, type ExtractionResult } from '../components/CertificateUpload';
 import { CertificatePreview, type Certificate } from '../components/CertificatePreview';
 import { useDialog } from '../context/DialogContext';
+
+type SettingsTab = 'master-cv' | 'profile-picture' | 'certificates' | 'prompts';
+
+const SETTINGS_TABS: { key: SettingsTab; label: string }[] = [
+  { key: 'master-cv', label: 'Master CV' },
+  { key: 'profile-picture', label: 'Profile Picture' },
+  { key: 'certificates', label: 'Certificates' },
+  { key: 'prompts', label: 'Prompts' },
+];
 
 export function Settings() {
   const { confirm, alert, toast } = useDialog();
   const [context, setContext] = useState({
     'master-cv.tex': '',
     'certificates.md': '',
-    'instructions.md': '',
   });
+  const [activeSection, setActiveSection] = useState<SettingsTab>('master-cv');
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
   
@@ -26,6 +35,18 @@ export function Settings() {
   const [profileImage, setProfileImage] = useState<{ exists: boolean; url?: string; filename?: string }>({ exists: false });
   const [uploadingProfile, setUploadingProfile] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Prompt editor state
+  const PROMPT_KEYS = ['generator', 'critique', 'validation'] as const;
+  const PROMPT_LABELS: Record<string, string> = {
+    'generator': 'Generator',
+    'critique': 'Critique',
+    'validation': 'Validation',
+  };
+  const [prompts, setPrompts] = useState<Record<string, string>>({});
+  const [promptDefaults, setPromptDefaults] = useState<Record<string, string>>({});
+  const [expandedPrompt, setExpandedPrompt] = useState<string | null>(null);
+  const [savingPrompts, setSavingPrompts] = useState(false);
 
   useEffect(() => {
     fetch('/api/settings/context')
@@ -47,6 +68,15 @@ export function Settings() {
       .catch(() => {
         setProfileImage({ exists: false });
       });
+
+    // Load prompts
+    Promise.all([
+      fetch('/api/settings/prompts').then(r => r.json()),
+      fetch('/api/settings/prompts/defaults').then(r => r.json()),
+    ]).then(([current, defaults]) => {
+      setPrompts(current);
+      setPromptDefaults(defaults);
+    }).catch(() => {});
   }, []);
 
   const loadCertificates = async () => {
@@ -152,12 +182,13 @@ export function Settings() {
   const handleSaveCertificates = async (certificates: Certificate[]) => {
     setSavingCertificates(true);
     try {
-      // Save each certificate
+      // Save each certificate (strip fields not accepted by the API)
       for (const cert of certificates) {
+        const { confidence, id, ...payload } = cert as any;
         await fetch('/api/certificates', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(cert),
+          body: JSON.stringify(payload),
         });
       }
 
@@ -253,6 +284,38 @@ export function Settings() {
     }
   };
 
+  const handleSavePrompts = async () => {
+    setSavingPrompts(true);
+    try {
+      const res = await fetch('/api/settings/prompts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(prompts),
+      });
+      if (res.ok) {
+        toast('Prompts saved successfully', 'success');
+      } else {
+        toast('Failed to save prompts', 'error');
+      }
+    } catch {
+      toast('Failed to save prompts', 'error');
+    } finally {
+      setSavingPrompts(false);
+    }
+  };
+
+  const handleResetPrompt = async (key: string) => {
+    const confirmed = await confirm({
+      title: 'Reset Prompt',
+      message: `Reset "${PROMPT_LABELS[key]}" to its default? Your customizations will be lost.`,
+      confirmText: 'Reset',
+      cancelText: 'Cancel',
+      severity: 'destructive',
+    });
+    if (!confirmed) return;
+    setPrompts(prev => ({ ...prev, [key]: promptDefaults[key] }));
+  };
+
   const handleDeleteCertificate = async (certId: string) => {
     const confirmed = await confirm({
       title: 'Delete Certificate',
@@ -318,22 +381,38 @@ export function Settings() {
         </button>
       </div>
 
+      <div className="flex gap-4 border-b border-border">
+        {SETTINGS_TABS.map(tab => (
+          <button
+            key={tab.key}
+            onClick={() => setActiveSection(tab.key)}
+            className={`pb-2 text-sm font-medium transition-colors ${
+              activeSection === tab.key
+                ? 'text-text-primary border-b-2 border-accent'
+                : 'text-text-secondary hover:text-text-primary'
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
       <div className="space-y-8">
         {/* Master CV Section */}
-        <section className="bg-bg-surface border border-border rounded p-8 space-y-4">
+        <section className={`bg-bg-surface border border-border rounded p-8 space-y-4${activeSection !== 'master-cv' ? ' hidden' : ''}`}>
           <h2 className="text-lg font-serif text-text-primary">Master CV (LaTeX)</h2>
           <p className="text-sm text-text-secondary">The base LaTeX template and content to draw from.</p>
           <textarea
             rows={15}
             value={context['master-cv.tex']}
             onChange={e => setContext({...context, 'master-cv.tex': e.target.value})}
-            className="w-full bg-bg-base border border-border rounded-sm p-4 text-text-primary focus:outline-none focus:border-accent transition-colors font-mono whitespace-pre-wrap resize-y"
+            className="w-full bg-bg-base border border-border rounded-sm p-4 text-text-primary focus:outline-none focus:border-accent transition-colors font-mono text-sm whitespace-pre-wrap resize-y"
             spellCheck={false}
           />
         </section>
 
         {/* Profile Picture Section */}
-        <section className="bg-bg-surface border border-border rounded p-8 space-y-4">
+        <section className={`bg-bg-surface border border-border rounded p-8 space-y-4${activeSection !== 'profile-picture' ? ' hidden' : ''}`}>
           <h2 className="text-lg font-serif text-text-primary flex items-center gap-2">
             <User size={20} />
             Profile Picture
@@ -410,7 +489,7 @@ export function Settings() {
         </section>
 
         {/* Certificates Section - New Design */}
-        <section className="bg-bg-surface border border-border rounded p-8 space-y-4">
+        <section className={`bg-bg-surface border border-border rounded p-8 space-y-4${activeSection !== 'certificates' ? ' hidden' : ''}`}>
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-lg font-serif text-text-primary flex items-center gap-2">
@@ -482,7 +561,7 @@ export function Settings() {
                  rows={10}
                  value={context['certificates.md']}
                  onChange={e => setContext({...context, 'certificates.md': e.target.value})}
-                 className="w-full bg-bg-base border border-border rounded-sm p-4 text-text-primary focus:outline-none focus:border-accent transition-colors font-mono whitespace-pre-wrap resize-y"
+                 className="w-full bg-bg-base border border-border rounded-sm p-4 text-text-primary focus:outline-none focus:border-accent transition-colors font-mono text-sm whitespace-pre-wrap resize-y"
                  spellCheck={false}
                />
               
@@ -547,17 +626,69 @@ export function Settings() {
           )}
         </section>
 
-        {/* Custom Instructions Section */}
-        <section className="bg-bg-surface border border-border rounded p-8 space-y-4">
-          <h2 className="text-lg font-serif text-text-primary">Custom Instructions (Markdown)</h2>
-          <p className="text-sm text-text-secondary">Personal rules for the AI (e.g., "Always emphasize my leadership experience").</p>
-          <textarea
-            rows={8}
-            value={context['instructions.md']}
-            onChange={e => setContext({...context, 'instructions.md': e.target.value})}
-            className="w-full bg-bg-base border border-border rounded-sm p-4 text-text-primary focus:outline-none focus:border-accent transition-colors font-mono whitespace-pre-wrap resize-y"
-            spellCheck={false}
-          />
+        {/* Generation Prompts Section */}
+        <section className={`bg-bg-surface border border-border rounded p-8 space-y-4${activeSection !== 'prompts' ? ' hidden' : ''}`}>
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-lg font-serif text-text-primary">Generation Prompts</h2>
+              <p className="text-sm text-text-secondary mt-1">
+                Customize the prompts used in each stage of the CV generation pipeline.
+              </p>
+            </div>
+            <button
+              onClick={handleSavePrompts}
+              disabled={savingPrompts}
+              className="flex items-center gap-2 text-sm bg-accent hover:bg-accent-hover text-bg-base font-medium px-4 py-2 rounded-sm transition-colors disabled:opacity-50"
+            >
+              {savingPrompts ? <Loader2 className="animate-spin" size={16} /> : <Save size={16} />}
+              {savingPrompts ? 'Saving...' : 'Save Prompts'}
+            </button>
+          </div>
+
+          <div className="space-y-2">
+            {PROMPT_KEYS.map(key => {
+              const isExpanded = expandedPrompt === key;
+              const isModified = promptDefaults[key] && prompts[key] !== promptDefaults[key];
+              return (
+                <div key={key} className="border border-border rounded">
+                  <button
+                    type="button"
+                    onClick={() => setExpandedPrompt(isExpanded ? null : key)}
+                    className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-bg-base transition-colors"
+                  >
+                    <div className="flex items-center gap-2">
+                      {isExpanded ? <ChevronDown size={16} className="text-text-secondary" /> : <ChevronRight size={16} className="text-text-secondary" />}
+                      <span className="text-sm font-medium text-text-primary">{PROMPT_LABELS[key]}</span>
+                      {isModified && (
+                        <span className="text-xs bg-accent/20 text-accent px-2 py-0.5 rounded">customized</span>
+                      )}
+                    </div>
+                  </button>
+                  {isExpanded && (
+                    <div className="px-4 pb-4 space-y-2">
+                      <textarea
+                        rows={15}
+                        value={prompts[key] || ''}
+                        onChange={e => setPrompts(prev => ({ ...prev, [key]: e.target.value }))}
+                        className="w-full bg-bg-base border border-border rounded-sm p-4 text-text-primary focus:outline-none focus:border-accent transition-colors font-mono text-sm whitespace-pre-wrap resize-y"
+                        spellCheck={false}
+                      />
+                      {isModified && (
+                        <button
+                          type="button"
+                          onClick={() => handleResetPrompt(key)}
+                          className="flex items-center gap-1 text-xs text-text-secondary hover:text-accent transition-colors"
+                        >
+                          <RotateCcw size={12} />
+                          Reset to default
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
         </section>
       </div>
     </div>

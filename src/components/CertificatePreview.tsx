@@ -10,6 +10,7 @@ interface Certificate {
   expiryDate?: string;
   credentialId?: string;
   skills: string[];
+  activities: string[];
   description?: string;
   confidence: number;
 }
@@ -72,6 +73,37 @@ export function CertificatePreview({ results, onSave, onCancel, saving = false }
     );
   };
 
+  const updateActivity = (certIndex: number, activityIndex: number, value: string) => {
+    setCertificates(prev =>
+      prev.map((cert, i) =>
+        i === certIndex
+          ? {
+              ...cert,
+              activities: cert.activities.map((a, j) => (j === activityIndex ? value : a)),
+            }
+          : cert
+      )
+    );
+  };
+
+  const addActivity = (certIndex: number) => {
+    setCertificates(prev =>
+      prev.map((cert, i) =>
+        i === certIndex ? { ...cert, activities: [...cert.activities, ''] } : cert
+      )
+    );
+  };
+
+  const removeActivity = (certIndex: number, activityIndex: number) => {
+    setCertificates(prev =>
+      prev.map((cert, i) =>
+        i === certIndex
+          ? { ...cert, activities: cert.activities.filter((_, j) => j !== activityIndex) }
+          : cert
+      )
+    );
+  };
+
   const removeCertificate = (index: number) => {
     setCertificates(prev => prev.filter((_, i) => i !== index));
   };
@@ -86,6 +118,7 @@ export function CertificatePreview({ results, onSave, onCancel, saving = false }
         expiryDate: '',
         credentialId: '',
         skills: [],
+        activities: [],
         description: '',
         confidence: 1,
       },
@@ -290,6 +323,53 @@ export function CertificatePreview({ results, onSave, onCancel, saving = false }
                     </button>
                   </div>
                 </div>
+
+                {/* Activities (for work certificates) */}
+                {cert.activities && cert.activities.length > 0 && (
+                  <div className="md:col-span-2">
+                    <label className="block text-sm text-text-secondary mb-2">
+                      Work Activities/Responsibilities
+                    </label>
+                    <div className="space-y-2">
+                      {cert.activities.map((activity, activityIndex) => (
+                        <div
+                          key={activityIndex}
+                          className="flex items-center gap-2"
+                        >
+                          <input
+                            type="text"
+                            value={activity}
+                            onChange={e => updateActivity(index, activityIndex, e.target.value)}
+                            placeholder="e.g., Developed REST APIs for customer portal"
+                            className="flex-1 bg-bg-base border border-border rounded px-3 py-2 text-sm text-text-primary focus:outline-none focus:border-accent"
+                          />
+                          <button
+                            onClick={() => removeActivity(index, activityIndex)}
+                            className="text-text-secondary hover:text-red-500 flex-shrink-0"
+                          >
+                            ×
+                          </button>
+                        </div>
+                      ))}
+                      <button
+                        onClick={() => addActivity(index)}
+                        className="text-sm text-accent hover:text-accent-hover border border-dashed border-accent/50 rounded px-3 py-1 transition-colors"
+                      >
+                        + Add Activity
+                      </button>
+                    </div>
+                  </div>
+                )}
+                {cert.activities && cert.activities.length === 0 && (
+                  <div className="md:col-span-2">
+                    <button
+                      onClick={() => addActivity(index)}
+                      className="text-sm text-text-secondary hover:text-accent transition-colors"
+                    >
+                      + Add work activities (for work certificates)
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           ))}

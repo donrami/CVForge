@@ -6,7 +6,6 @@ import cookieParser from 'cookie-parser';
 import { PrismaClient } from '@prisma/client';
 import { GoogleGenAI } from '@google/genai';
 import { fileURLToPath } from 'url';
-import rateLimit from 'express-rate-limit';
 import cors from 'cors';
 import { logger } from './server/services/logger.js';
 
@@ -29,16 +28,6 @@ async function startServer() {
     credentials: true,
   }));
 
-  // Rate limit login endpoint: 5 attempts per 15 minutes per IP
-  const loginLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000,
-    max: 5,
-    message: { error: 'Too many login attempts, please try again later' },
-    standardHeaders: true,
-    legacyHeaders: false,
-  });
-  app.use('/api/auth/login', loginLimiter);
-
   // API Routes
   app.get('/api/health', async (req, res) => {
     try {
@@ -49,7 +38,7 @@ async function startServer() {
     }
   });
 
-  const { apiRouter, requireAuth } = await import('./server/routes.js');
+  const { apiRouter } = await import('./server/routes.js');
   const { generateRouter } = await import('./server/generate.js');
   const { certificateRouter } = await import('./server/certificates.js');
   
@@ -57,9 +46,9 @@ async function startServer() {
   app.use('/api', generateRouter);
   app.use('/api', certificateRouter);
 
-  // Serve uploaded files statically (auth-protected)
+  // Serve uploaded files statically
   const uploadsDir = path.join(__dirname, 'uploads');
-  app.use('/uploads', requireAuth, express.static(uploadsDir));
+  app.use('/uploads', express.static(uploadsDir));
   
   // Custom middleware to handle 404 for missing upload files
   app.use('/uploads', (req, res) => {

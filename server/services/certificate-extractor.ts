@@ -8,6 +8,7 @@ export interface ExtractedCertificate {
   expiryDate?: string;
   credentialId?: string;
   skills: string[];
+  activities: string[];
   description?: string;
   confidence: number;
 }
@@ -61,6 +62,7 @@ OPTIONAL FIELDS (extract if present, use null if not found):
 - expiryDate: For skill certs: when it expires. For work certs: use null.
 - credentialId: For skill certs: certificate ID. For work certs: employee ID or reference number if present.
 - skills: Array of skills/technologies/competencies (1-3 words each, max 10 items)
+- activities: For work certificates ONLY: Array of specific work activities, tasks, and responsibilities performed. Each entry should be a concise phrase describing a concrete activity (e.g., "Developed REST APIs for customer portal", "Led migration from monolith to microservices", "Conducted code reviews and mentored junior developers"). Extract as many distinct activities as mentioned in the document. For skill certificates: use an empty array [].
 - description: Brief 1-2 sentence summary. For skill certs: what it certifies. For work certs: role and responsibilities.
 
 RULES:
@@ -91,6 +93,7 @@ Return ONLY a JSON object in this exact format (no markdown, no explanation):
   "expiryDate": "string or null",
   "credentialId": "string or null",
   "skills": ["array", "of", "strings"],
+  "activities": ["array", "of", "activity", "strings"],
   "description": "string or null",
   "confidence": 0.95
 }
@@ -154,6 +157,11 @@ export async function extractCertificateFromPDF(
     // Ensure skills is an array
     if (!Array.isArray(parsed.skills)) {
       parsed.skills = [];
+    }
+
+    // Ensure activities is an array
+    if (!Array.isArray(parsed.activities)) {
+      parsed.activities = [];
     }
 
     // Ensure confidence is a number

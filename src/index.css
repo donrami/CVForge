@@ -19,7 +19,7 @@
   --color-destructive: #a05050;
   
   --font-sans: "DM Sans", ui-sans-serif, system-ui, sans-serif;
-  --font-serif: "DM Serif Display", ui-serif, Georgia, Cambria, "Times New Roman", Times, serif;
+  --font-serif: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "DM Mono", "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
 }
 
@@ -40,30 +40,33 @@
   }
 }
 
-/* Themed scrollbars for textareas */
-textarea::-webkit-scrollbar {
+/* Unified scrollbar styles */
+*::-webkit-scrollbar {
   width: 8px;
   height: 8px;
 }
 
-textarea::-webkit-scrollbar-track {
+*::-webkit-scrollbar-track {
   background: var(--color-bg-elevated);
   border-radius: 4px;
 }
 
-textarea::-webkit-scrollbar-thumb {
+*::-webkit-scrollbar-thumb {
   background: var(--color-text-muted);
   border-radius: 4px;
 }
 
-textarea::-webkit-scrollbar-thumb:hover {
+*::-webkit-scrollbar-thumb:hover {
   background: var(--color-text-secondary);
 }
 
 /* Firefox scrollbar styling */
-textarea {
+* {
   scrollbar-width: thin;
   scrollbar-color: var(--color-text-muted) var(--color-bg-elevated);
+}
+
+textarea {
   resize: vertical; /* Allow vertical resizing only */
 }
 
@@ -72,11 +75,6 @@ textarea::-webkit-resizer {
   border: 1px solid var(--color-border);
   background-color: var(--color-bg-surface);
   border-radius: 0 0 4px 0;
-}
-
-/* Firefox resize handle styling */
-textarea {
-  resize: vertical;
 }
 
 /* Button cursor pointer */

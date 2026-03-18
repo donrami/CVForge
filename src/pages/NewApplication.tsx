@@ -1,35 +1,21 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowRight, Loader2, ChevronUp, ChevronDown } from 'lucide-react';
+import { ArrowRight, Loader2, RotateCcw } from 'lucide-react';
 import { useDialog } from '../context/DialogContext';
 
 export function NewApplication() {
   const navigate = useNavigate();
   const { toast } = useDialog();
   const [loading, setLoading] = useState(false);
+  const [loadingLast, setLoadingLast] = useState(false);
   const [progress, setProgress] = useState<string[]>([]);
   const [formData, setFormData] = useState({
     companyName: '',
     jobTitle: '',
     jobDescription: '',
     targetLanguage: 'EN',
-    iterationCount: 2,
     additionalContext: '',
   });
-
-  const handleIncrement = () => {
-    setFormData(prev => ({
-      ...prev,
-      iterationCount: Math.min(5, prev.iterationCount + 1)
-    }));
-  };
-
-  const handleDecrement = () => {
-    setFormData(prev => ({
-      ...prev,
-      iterationCount: Math.max(1, prev.iterationCount - 1)
-    }));
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -72,6 +58,31 @@ export function NewApplication() {
     } catch (err: any) {
       setProgress(p => [...p, `Error: ${err.message}`]);
       setLoading(false);
+    }
+  };
+
+  const handleLoadLast = async () => {
+    setLoadingLast(true);
+    try {
+      const res = await fetch('/api/applications?take=1');
+      const data = await res.json();
+      const last = data.applications?.[0];
+      if (!last) {
+        toast('No previous applications found.', 'error');
+        return;
+      }
+      setFormData({
+        companyName: last.companyName || '',
+        jobTitle: last.jobTitle || '',
+        jobDescription: last.jobDescription || '',
+        targetLanguage: last.targetLanguage || 'EN',
+        additionalContext: last.additionalContext || '',
+      });
+      toast('Loaded inputs from last application.', 'success');
+    } catch {
+      toast('Failed to load last application.', 'error');
+    } finally {
+      setLoadingLast(false);
     }
   };
 
@@ -134,8 +145,7 @@ export function NewApplication() {
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-6 items-end">
-            <div className="space-y-2">
+          <div className="space-y-2">
               <label className="block text-sm font-medium text-text-secondary uppercase tracking-wider">Target Language</label>
               <select
                 value={formData.targetLanguage}
@@ -146,35 +156,6 @@ export function NewApplication() {
                 <option value="DE">German (DE)</option>
               </select>
             </div>
-            <div className="space-y-2">
-              <label className="block text-sm font-medium text-text-secondary uppercase tracking-wider">Critique Passes</label>
-              <div className="flex items-center h-[42px] bg-bg-base border border-border rounded-sm focus-within:border-accent transition-colors">
-                <span className="flex-1 px-4 py-2 text-text-primary">
-                  {formData.iterationCount}
-                </span>
-                <div className="flex flex-col border-l border-border">
-                  <button
-                    type="button"
-                    onClick={handleIncrement}
-                    disabled={formData.iterationCount >= 5}
-                    className="flex items-center justify-center px-3 py-1 text-text-secondary hover:text-accent transition-colors border-b border-border disabled:opacity-30 disabled:cursor-not-allowed"
-                    aria-label="Increase critique passes"
-                  >
-                    <ChevronUp size={14} />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleDecrement}
-                    disabled={formData.iterationCount <= 1}
-                    className="flex items-center justify-center px-3 py-1 text-text-secondary hover:text-accent transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-                    aria-label="Decrease critique passes"
-                  >
-                    <ChevronDown size={14} />
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
 
           <div className="space-y-2">
             <label className="block text-sm font-medium text-text-secondary uppercase tracking-wider">Additional Context (Optional)</label>
@@ -187,7 +168,16 @@ export function NewApplication() {
             />
           </div>
 
-          <div className="pt-4 border-t border-border flex justify-end">
+          <div className="pt-4 border-t border-border flex justify-end gap-3">
+            <button
+              type="button"
+              onClick={handleLoadLast}
+              disabled={loadingLast}
+              className="flex items-center gap-2 bg-[#6a8a9a] hover:bg-[#7a9aaa] text-bg-base font-medium px-5 py-2.5 rounded transition-colors disabled:opacity-50"
+            >
+              {loadingLast ? <Loader2 className="animate-spin" size={16} /> : <RotateCcw size={16} />}
+              Load Last
+            </button>
             <button 
               type="submit"
               className="flex items-center gap-2 bg-accent hover:bg-accent-hover text-bg-base font-medium px-6 py-2.5 rounded transition-colors"

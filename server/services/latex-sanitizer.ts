@@ -72,3 +72,26 @@ export function assertSafeLatex(latex: string): void {
     );
   }
 }
+
+/**
+ * Escapes unescaped LaTeX special characters in content areas.
+ * Handles & characters that appear in text (not in tabular/align environments).
+ * Skips already-escaped sequences like \&.
+ */
+export function escapeLatexSpecialChars(latex: string): string {
+  // Escape unescaped & that are NOT inside tabular/align environments
+  // and NOT already escaped (preceded by \)
+  const lines = latex.split('\n');
+  let inTabular = 0;
+
+  return lines.map(line => {
+    // Track tabular-like environments where & is a column separator
+    if (/\\begin\{(tabular|array|align|matrix|pmatrix|bmatrix|cases)\*?\}/.test(line)) inTabular++;
+    if (/\\end\{(tabular|array|align|matrix|pmatrix|bmatrix|cases)\*?\}/.test(line)) inTabular--;
+
+    if (inTabular > 0) return line;
+
+    // Replace unescaped & (not preceded by \) with \&
+    return line.replace(/(?<!\\)&/g, '\\&');
+  }).join('\n');
+}
