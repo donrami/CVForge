@@ -9,7 +9,7 @@ CVForge is a self-hosted, single-user AI-powered CV generator and job applicatio
 - Frontend: React 19, TypeScript, Vite, Tailwind CSS v4, React Router
 - Backend: Node.js 22, Express, TypeScript (via tsx), Prisma ORM
 - Database: PostgreSQL 16
-- AI: Google Gemini API (`gemini-3-flash-preview`) via `@google/genai`
+- AI: Google Gemini API (`gemini-3.1-pro-preview`) via `@google/genai`
 - PDF compilation: LuaLaTeX (primary), pdflatex (fallback), 30s timeout
 - PDF extraction: Gemini Vision multimodal API (replaces legacy OCR)
 - LaTeX Sanitizer: strips dangerous commands, deduplicates preamble, escapes special chars on direct LLM output
@@ -21,7 +21,7 @@ CVForge is a self-hosted, single-user AI-powered CV generator and job applicatio
 ```
 server.ts                         # Express entry point. Initializes Prisma, Gemini client, Vite dev middleware, static serving, health check. Exports `prisma` and `ai` singletons.
 server/
-  routes.ts                       # Main API router. CRUD for applications (list, get, patch, soft-delete). Download endpoints for .tex and .pdf (compiles on demand). Settings endpoints for master CV, certificates.md, profile image (multer upload), and prompt management. Chat assistant endpoint (/prompts/chat).
+  routes.ts                       # Main API router. CRUD for applications (list, get, patch, soft-delete). Download endpoints for .tex and .pdf (compiles on demand). Backup/restore endpoints (JSON export/import with merge). PDF export endpoint. Settings endpoints for master CV, certificates.md, profile image (multer upload), and prompt management. Chat assistant endpoint (/prompts/chat).
   generate.ts                     # CV generation pipeline. LLM produces LaTeX directly. Streams character-count progress via SSE. Extracts LaTeX from response (handles markdown fences), sanitizes, handles profile image injection, saves to DB and filesystem. Also handles /regenerate (creates child application from parent).
   certificates.ts                 # Certificate CRUD + PDF extraction via Gemini Vision + sync-to-context (writes certificates.md). Supports both skill certificates and work certificates (Arbeitszeugnisse).
   middleware/upload.ts            # Multer config for certificate PDF uploads (temp directory, file size limits).
@@ -32,16 +32,19 @@ server/
     pdf-extractor.ts              # Gemini Vision-based PDF text extraction. Sends PDF directly to Gemini's multimodal API which handles both native text and scanned/image-based PDFs. Returns structured extraction results with language detection.
     profile-image.ts              # Finds user's uploaded profile image, copies it to generation directory, patches \includegraphics references in LaTeX. Falls back to 1x1 transparent PNG placeholder if no image uploaded.
     prompts.ts                    # File-based prompt management. Reads/writes generator.md from context/prompts/. No hardcoded fallback — the file must exist. Exposes loadAllPrompts(), saveAllPrompts(), getDefaults().
+    backup.ts                     # BackupService. Exports all non-deleted applications as a JSON file with version metadata. Returns BackupData with version, exportedAt, and applications array.
+    restore.ts                    # RestoreService. Validates uploaded JSON backup files (structure, required fields, enum values, ISO dates). Restores via Prisma $transaction with upsert (merge by id). Returns created/updated counts.
+    pdf-export.ts                 # PDFExportService. Generates a PDF table of applications using pdfkit. Columns: Company, Role, Status, Language, Date. Returns a Buffer.
     logger.ts                     # Pino logger instance.
 
 src/                              # React SPA frontend
   pages/
-    Dashboard.tsx                 # Lists applications, filterable by status.
+    Dashboard.tsx                 # Lists applications with pagination (10 per page). Toolbar with Backup (JSON), Export PDF, and Restore buttons. Search filter resets to page 1. Restore flow: file picker → confirmation dialog → upload → refresh.
     NewApplication.tsx            # Form: company name, job title, job description, target language (EN/DE), additional context. Streams generation progress via SSE.
     ApplicationDetail.tsx         # View application details, download PDF/TEX, update status/notes/dates, regenerate with additional context.
     Settings.tsx                  # Tabs: Master CV editor, Certificate management (upload/extract/edit/sync), Profile image upload, Prompt editor (generator with reset-to-defaults).
     Login.tsx                     # (Removed — no auth needed for self-hosted use)
-  components/                     # UI components, dialogs, layout wrapper.
+  components/                     # UI components, dialogs, layout wrapper. Includes PaginationControls (Previous/Next with page info) and RestoreConfirmationDialog (merge confirmation with application count).
   context/                        # React context providers for dialog state.
 
 context/                          # User context files (gitignored, persisted via Docker volumes)
@@ -82,7 +85,10 @@ Two models in PostgreSQL via Prisma:
 ## API Endpoints
 
 ### Applications
-- `GET /api/applications` — paginated list (skip/take), excludes soft-deleted
+- `GET /api/applications` — paginated list (skip/take, default 10 per page), excludes soft-deleted, returns `{ applications, total, skip, take }`
+- `GET /api/applications/backup` — download JSON backup of all non-deleted applications (Content-Disposition: `cvforge-backup-YYYY-MM-DD.json`)
+- `POST /api/applications/restore` — upload JSON backup (multipart/form-data), validates structure, merges via upsert, returns `{ success, created, updated }`
+- `GET /api/applications/export/pdf` — download PDF export of all non-deleted applications (Content-Disposition: `cvforge-applications-YYYY-MM-DD.pdf`)
 - `GET /api/applications/:id` — detail with parent and regenerations
 - `PATCH /api/applications/:id` — update status, notes, dates (Zod validated)
 - `DELETE /api/applications/:id` — soft delete (sets deletedAt)

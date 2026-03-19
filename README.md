@@ -7,7 +7,9 @@ CVForge is a personal, self-hosted AI-powered CV generator and job application t
 - **AI-Powered CV Tailoring** — Single-pass generation pipeline using Gemini that produces LaTeX directly from your master CV template, giving the LLM full control over formatting and tailoring for high-quality, context-aware CVs
 - **German & International Standards** — Automatically detects CV language and applies the correct conventions (German *Bewerbungskultur* vs. international/ATS-optimized format)
 - **LaTeX to PDF** — Compiles generated `.tex` files to PDF via LuaLaTeX (with pdflatex fallback)
-- **Application Tracker** — Track job applications through statuses (Generated → Applied → Interview → Offer / Rejected / Withdrawn) with notes and dates
+- **Application Tracker** — Track job applications through statuses (Generated → Applied → Interview → Offer / Rejected / Withdrawn) with notes and dates. Paginated list with 10 items per page
+- **Backup & Restore** — Export all application data as a JSON backup file. Restore from a backup with merge logic (updates existing records, creates new ones, leaves unmatched records untouched)
+- **PDF Export** — Export the full application list as a formatted PDF table
 - **Regeneration Lineage** — Regenerate CVs with additional context and track the parent/child history
 - **Certificate OCR** — Upload PDF certificates (work references, certifications, course completions) and extract structured data via Gemini Vision. Extracted certificates are stored in the database and can be synced to a context file for use in generation
 - **Profile Image Support** — Upload a profile photo that gets embedded into generated CVs automatically
@@ -20,7 +22,7 @@ CVForge is a personal, self-hosted AI-powered CV generator and job application t
 - **Frontend:** React 19, TypeScript, Vite, Tailwind CSS v4, React Router
 - **Backend:** Node.js 22, Express, TypeScript (tsx), Prisma ORM
 - **Database:** PostgreSQL 16
-- **AI:** Google Gemini API (`gemini-3-flash-preview`) via `@google/genai`
+- **AI:** Google Gemini API (`gemini-3.1-pro-preview`) via `@google/genai`
 - **PDF:** LuaLaTeX / pdflatex
 - **DevOps:** Docker, Docker Compose, multi-stage Dockerfile
 
@@ -55,11 +57,14 @@ npm run dev
 ```
 ├── server.ts              # Express server entry point
 ├── server/
-│   ├── routes.ts          # API routes (applications, settings, profile image, prompts)
+│   ├── routes.ts          # API routes (applications, settings, backup/restore, PDF export, prompts)
 │   ├── generate.ts        # CV generation pipeline (direct LaTeX output from LLM)
 │   ├── certificates.ts    # Certificate CRUD + OCR extraction + context sync
 │   ├── middleware/         # Multer upload config
 │   └── services/
+│       ├── backup.ts                 # JSON backup export service
+│       ├── restore.ts                # JSON backup restore/merge service
+│       ├── pdf-export.ts             # PDF table export service (pdfkit)
 │       ├── certificate-extractor.ts  # Gemini Vision PDF extraction
 │       ├── latex-sanitizer.ts        # Security sanitization for LaTeX output
 │       ├── pdf-extractor.ts          # PDF text + image extraction (native + OCR fallback)
@@ -68,7 +73,7 @@ npm run dev
 │       └── logger.ts                 # Pino logger
 ├── src/                   # React frontend
 │   ├── pages/             # Dashboard, NewApplication, ApplicationDetail, Settings
-│   ├── components/        # UI components, dialogs, layout
+│   ├── components/        # UI components (PaginationControls, RestoreConfirmationDialog), dialogs, layout
 │   └── context/           # Dialog context providers
 ├── context/               # User context files (master CV, certificates, prompts)
 ├── prisma/schema.prisma   # Database schema

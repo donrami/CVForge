@@ -96,7 +96,7 @@ IMPORTANT: Always use TARGET LANGUAGE = "${promptLanguage}" for the output forma
 
     sendEvent('step', { message: 'Analyzing job requirements and crafting your CV...' });
 
-    const modelId = 'gemini-3-flash-preview';
+    const modelId = 'gemini-3.1-pro-preview';
     
     // Use streaming to provide live progress during the long AI generation step
     const stream = await ai.models.generateContentStream({

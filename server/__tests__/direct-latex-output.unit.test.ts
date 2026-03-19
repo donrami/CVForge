@@ -43,7 +43,7 @@ describe('generation log structure', () => {
     // Simulate what the pipeline produces
     const log = {
       rawResponse: 'some latex content',
-      model: 'gemini-3-flash-preview',
+      model: 'gemini-3.1-pro-preview',
       timestamp: new Date().toISOString(),
       targetLanguage: 'en',
     };

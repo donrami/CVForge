@@ -1,7 +1,7 @@
 /**
  * PDF Text Extraction Service
  * 
- * Uses Gemini Vision (gemini-3-flash-preview) for ALL PDF extraction.
+ * Uses Gemini Vision (gemini-3.1-pro-preview) for ALL PDF extraction.
  * This is faster, more accurate for structured data, and eliminates
  * the need for legacy OCR libraries (tesseract.js, pdf2pic, sharp, pdf-parse).
  * 
@@ -68,7 +68,7 @@ export async function extractTextFromPDF(
 
     const model = ai.models;
     const response = await model.generateContent({
-      model: 'gemini-3-flash-preview',
+      model: 'gemini-3.1-pro-preview',
       contents: [
         {
           role: 'user',
@@ -149,7 +149,7 @@ export async function extractTextFromPDFBuffer(
 
     const model = ai.models;
     const response = await model.generateContent({
-      model: 'gemini-3-flash-preview',
+      model: 'gemini-3.1-pro-preview',
       contents: [
         {
           role: 'user',

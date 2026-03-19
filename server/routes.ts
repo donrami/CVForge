@@ -9,6 +9,9 @@ import util from 'util';
 import { assertSafeLatex, escapeLatexSpecialChars } from './services/latex-sanitizer.js';
 import { logger } from './services/logger.js';
 import { prepareProfileImage } from './services/profile-image.js';
+import { generateBackup } from './services/backup.js';
+import { validateBackupFile, restoreFromBackup } from './services/restore.js';
+import { generateApplicationsPDF } from './services/pdf-export.js';
 
 const execFileAsync = util.promisify(execFile);
 
@@ -37,7 +40,7 @@ export const requireAuth = (_req: any, _res: any, next: any) => next();
 apiRouter.get('/applications', requireAuth, async (req, res) => {
   try {
     const skip = Math.max(0, parseInt(req.query.skip as string) || 0);
-    const take = Math.min(100, Math.max(1, parseInt(req.query.take as string) || 50));
+    const take = Math.min(100, Math.max(1, parseInt(req.query.take as string) || 10));
 
     const [applications, total] = await Promise.all([
       prisma.application.findMany({
@@ -51,6 +54,87 @@ apiRouter.get('/applications', requireAuth, async (req, res) => {
     res.json({ applications, total, skip, take });
   } catch (e) {
     errorResponse(res, 500, e, 'DATABASE_ERROR');
+  }
+});
+
+apiRouter.get('/applications/backup', requireAuth, async (_req, res) => {
+  try {
+    const backup = await generateBackup();
+    const date = new Date().toISOString().slice(0, 10);
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Content-Disposition', `attachment; filename="cvforge-backup-${date}.json"`);
+    res.json(backup);
+  } catch (e) {
+    errorResponse(res, 500, e, 'DATABASE_ERROR');
+  }
+});
+
+// Multer config for JSON backup restore uploads (memory storage)
+const restoreUpload = multer({
+  storage: multer.memoryStorage(),
+  fileFilter: (_req: any, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
+    if (path.extname(file.originalname).toLowerCase() === '.json') {
+      cb(null, true);
+    } else {
+      cb(new Error('Only .json files are allowed'));
+    }
+  },
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
+});
+
+apiRouter.post('/applications/restore', requireAuth, restoreUpload.single('file'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No file uploaded', code: 'INVALID_FORMAT' });
+    }
+
+    // Parse JSON from uploaded buffer
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(req.file.buffer.toString('utf-8'));
+    } catch {
+      return res.status(400).json({ error: 'Invalid JSON format', code: 'INVALID_FORMAT' });
+    }
+
+    // Validate backup structure
+    let backup;
+    try {
+      backup = validateBackupFile(parsed);
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e);
+      // Distinguish between missing applications array and field-level validation errors
+      const code = message.includes('applications array') || message.includes('must be a JSON object')
+        ? 'INVALID_STRUCTURE'
+        : 'VALIDATION_ERROR';
+      return res.status(400).json({ error: message, code });
+    }
+
+    // Perform the restore
+    const result = await restoreFromBackup(backup);
+    return res.json({ success: true, created: result.created, updated: result.updated });
+  } catch (e) {
+    return errorResponse(res, 500, e, 'RESTORE_ERROR');
+  }
+});
+
+apiRouter.get('/applications/export/pdf', requireAuth, async (_req, res) => {
+  try {
+    const applications = await prisma.application.findMany({
+      where: { deletedAt: null },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    const pdfBuffer = await generateApplicationsPDF(applications, {
+      title: 'CVForge Applications',
+      exportDate: new Date(),
+    });
+
+    const date = new Date().toISOString().slice(0, 10);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="cvforge-applications-${date}.pdf"`);
+    res.send(pdfBuffer);
+  } catch (e) {
+    errorResponse(res, 500, e, 'PDF_ERROR');
   }
 });
 
@@ -99,6 +183,11 @@ apiRouter.delete('/applications/:id', requireAuth, async (req, res) => {
       where: { id: req.params.id },
       data: { deletedAt: new Date() }
     });
+
+    // Remove generated files from disk
+    const genDir = path.join(process.cwd(), 'generated', req.params.id);
+    await fs.rm(genDir, { recursive: true, force: true });
+
     res.json({ success: true });
   } catch (e) {
     errorResponse(res, 500, e, 'DATABASE_ERROR');
@@ -435,7 +524,7 @@ When suggesting modifications, wrap full replacements in code blocks.`;
     }));
 
     const result = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
+      model: 'gemini-3.1-pro-preview',
       config: { systemInstruction },
       contents,
     });

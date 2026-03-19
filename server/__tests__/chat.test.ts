@@ -214,7 +214,7 @@ describe('Feature: prompt-chat-assistant — Backend', () => {
       expect(chatHandlers!.length).toBeGreaterThan(0);
     });
 
-    it('uses gemini-3-flash-preview model string', async () => {
+    it('uses gemini-3.1-pro-preview model string', async () => {
       (loadAllPrompts as any).mockResolvedValue({
         generator: 'g',
         critique: 'c',
@@ -231,7 +231,7 @@ describe('Feature: prompt-chat-assistant — Backend', () => {
         messages: [{ role: 'user', content: 'hello' }],
       });
 
-      expect(capturedModel).toBe('gemini-3-flash-preview');
+      expect(capturedModel).toBe('gemini-3.1-pro-preview');
     });
   });
 });

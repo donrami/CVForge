@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { FileText, Plus, Search, Filter, MoreVertical, Download, RefreshCw, Trash2 } from 'lucide-react';
+import { FileText, Plus, Search, Filter, Download, RefreshCw, Trash2, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useDialog } from '../context/DialogContext';
 import { EmptyState } from '../components/EmptyState';
+import { PaginationControls } from '../components/PaginationControls';
+import { RestoreConfirmationDialog } from '../components/dialogs/RestoreConfirmationDialog';
 
 interface Application {
   id: string;
@@ -19,18 +21,36 @@ export function Dashboard() {
   const [apps, setApps] = useState<Application[]>([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
+  const [backupLoading, setBackupLoading] = useState(false);
+  const [exportLoading, setExportLoading] = useState(false);
+  const [restoreLoading, setRestoreLoading] = useState(false);
+  const [restoreDialogOpen, setRestoreDialogOpen] = useState(false);
+  const [restoreFile, setRestoreFile] = useState<File | null>(null);
+  const [restoreAppCount, setRestoreAppCount] = useState(0);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize] = useState(10);
+  const [total, setTotal] = useState(0);
   const [searchParams] = useSearchParams();
   const highlightedId = searchParams.get('highlighted');
   const { confirm, toast } = useDialog();
 
   useEffect(() => {
-    fetch('/api/applications')
-      .then(res => res.json())
+    const skip = (currentPage - 1) * pageSize;
+    fetch(`/api/applications?skip=${skip}&take=${pageSize}`)
+      .then(res => {
+        if (!res.ok) throw new Error('Failed to fetch applications');
+        return res.json();
+      })
       .then(data => {
         setApps(data.applications || []);
+        setTotal(data.total ?? 0);
+        setLoading(false);
+      })
+      .catch(() => {
+        toast('Failed to load applications', 'error');
         setLoading(false);
       });
-  }, []);
+  }, [currentPage, pageSize]);
 
   // Clear the highlighted parameter after first render
   useEffect(() => {
@@ -42,10 +62,71 @@ export function Dashboard() {
     }
   }, [highlightedId]);
 
+  const handleBackup = async () => {
+    setBackupLoading(true);
+    try {
+      const response = await fetch('/api/applications/backup');
+      if (!response.ok) throw new Error('Backup failed');
+      const blob = await response.blob();
+      const disposition = response.headers.get('Content-Disposition');
+      let filename = `cvforge-backup-${new Date().toISOString().slice(0, 10)}.json`;
+      if (disposition) {
+        const match = disposition.match(/filename="?([^"]+)"?/);
+        if (match) filename = match[1];
+      }
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch {
+      toast('Failed to download backup', 'error');
+    } finally {
+      setBackupLoading(false);
+    }
+  };
+
+  const handleExportPDF = async () => {
+    setExportLoading(true);
+    try {
+      const response = await fetch('/api/applications/export/pdf');
+      if (!response.ok) throw new Error('PDF export failed');
+      const blob = await response.blob();
+      const disposition = response.headers.get('Content-Disposition');
+      let filename = `cvforge-applications-${new Date().toISOString().slice(0, 10)}.pdf`;
+      if (disposition) {
+        const match = disposition.match(/filename="?([^"]+)"?/);
+        if (match) filename = match[1];
+      }
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch {
+      toast('Failed to export PDF', 'error');
+    } finally {
+      setExportLoading(false);
+    }
+  };
+
   const filteredApps = apps.filter(app =>
     app.companyName.toLowerCase().includes(search.toLowerCase()) ||
     app.jobTitle.toLowerCase().includes(search.toLowerCase())
   );
+
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+
+  const handleSearchChange = (value: string) => {
+    setSearch(value);
+    setCurrentPage(1);
+  };
 
   const handleDelete = async (id: string) => {
     const confirmed = await confirm({
@@ -61,6 +142,7 @@ export function Dashboard() {
         const response = await fetch(`/api/applications/${id}`, { method: 'DELETE' });
         if (response.ok) {
           setApps(apps.filter(app => app.id !== id));
+          setTotal(prev => Math.max(0, prev - 1));
           toast('Application deleted successfully', 'success');
         } else {
           toast('Failed to delete application', 'error');
@@ -69,6 +151,67 @@ export function Dashboard() {
         toast('Failed to delete application', 'error');
       }
     }
+  };
+
+  const handleRestoreClick = () => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.json';
+    input.onchange = async (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (!file) return;
+      try {
+        const text = await file.text();
+        const parsed = JSON.parse(text);
+        const count = parsed.applications?.length ?? 0;
+        setRestoreFile(file);
+        setRestoreAppCount(count);
+        setRestoreDialogOpen(true);
+      } catch {
+        toast('Failed to parse backup file. Please select a valid JSON file.', 'error');
+      }
+    };
+    input.click();
+  };
+
+  const handleRestoreConfirm = async () => {
+    if (!restoreFile) return;
+    setRestoreDialogOpen(false);
+    setRestoreLoading(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', restoreFile);
+      const response = await fetch('/api/applications/restore', {
+        method: 'POST',
+        body: formData,
+      });
+      if (!response.ok) {
+        const err = await response.json().catch(() => null);
+        throw new Error(err?.error || 'Restore failed');
+      }
+      const data = await response.json();
+      toast(`Restored: ${data.created} created, ${data.updated} updated`, 'success');
+      setCurrentPage(1);
+      // Re-fetch applications at page 1
+      const listRes = await fetch(`/api/applications?skip=0&take=${pageSize}`);
+      if (listRes.ok) {
+        const listData = await listRes.json();
+        setApps(listData.applications || []);
+        setTotal(listData.total ?? 0);
+      }
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Failed to restore backup', 'error');
+    } finally {
+      setRestoreLoading(false);
+      setRestoreFile(null);
+      setRestoreAppCount(0);
+    }
+  };
+
+  const handleRestoreCancel = () => {
+    setRestoreDialogOpen(false);
+    setRestoreFile(null);
+    setRestoreAppCount(0);
   };
 
   return (
@@ -94,13 +237,37 @@ export function Dashboard() {
             type="text" 
             placeholder="Search company or title..." 
             value={search}
-            onChange={e => setSearch(e.target.value)}
+            onChange={e => handleSearchChange(e.target.value)}
             className="w-full bg-bg-surface border border-border rounded pl-10 pr-4 py-2 text-text-primary focus:outline-none focus:border-accent transition-colors"
           />
         </div>
         <button className="flex items-center gap-2 px-4 py-2 border border-border rounded text-text-secondary hover:bg-bg-elevated transition-colors">
           <Filter size={18} />
           Filter
+        </button>
+        <button
+          disabled={backupLoading}
+          onClick={handleBackup}
+          className="flex items-center gap-2 px-4 py-2 border border-border rounded text-text-secondary hover:bg-bg-elevated transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {backupLoading ? <Loader2 size={18} className="animate-spin" /> : <Download size={18} />}
+          Backup
+        </button>
+        <button
+          disabled={exportLoading}
+          onClick={handleExportPDF}
+          className="flex items-center gap-2 px-4 py-2 border border-border rounded text-text-secondary hover:bg-bg-elevated transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {exportLoading ? <Loader2 size={18} className="animate-spin" /> : <FileText size={18} />}
+          Export PDF
+        </button>
+        <button
+          disabled={restoreLoading}
+          onClick={handleRestoreClick}
+          className="flex items-center gap-2 px-4 py-2 border border-border rounded text-text-secondary hover:bg-bg-elevated transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {restoreLoading ? <Loader2 size={18} className="animate-spin" /> : <RefreshCw size={18} />}
+          Restore
         </button>
       </div>
 
@@ -159,6 +326,21 @@ export function Dashboard() {
           </tbody>
         </table>
       </div>
+
+      <PaginationControls
+        currentPage={currentPage}
+        totalPages={totalPages}
+        totalItems={total}
+        onPageChange={setCurrentPage}
+        disabled={loading}
+      />
+
+      <RestoreConfirmationDialog
+        open={restoreDialogOpen}
+        applicationCount={restoreAppCount}
+        onConfirm={handleRestoreConfirm}
+        onCancel={handleRestoreCancel}
+      />
     </div>
   );
 }
