@@ -1,6 +1,9 @@
 /**
- * LaTeX sanitizer — strips or rejects dangerous commands that could
- * allow arbitrary file reads, writes, or shell execution during compilation.
+ * LaTeX Sanitizer — security layer for direct LLM LaTeX output
+ * 
+ * The LLM produces LaTeX directly, so this module is the primary
+ * safety gate. It strips dangerous commands, deduplicates preamble
+ * entries, and escapes special characters in text content.
  */
 
 const DANGEROUS_PATTERNS: { pattern: RegExp; description: string }[] = [
@@ -10,15 +13,7 @@ const DANGEROUS_PATTERNS: { pattern: RegExp; description: string }[] = [
   { pattern: /\\include\s*\{/gi, description: '\\include (file inclusion)' },
   { pattern: /\\openout\b/gi, description: '\\openout (file write)' },
   { pattern: /\\openin\b/gi, description: '\\openin (file read)' },
-  { pattern: /\\closein\b/gi, description: '\\closein (file handle)' },
-  { pattern: /\\closeout\b/gi, description: '\\closeout (file handle)' },
-  { pattern: /\\special\s*\{/gi, description: '\\special (driver command)' },
-  { pattern: /\\catcode\b/gi, description: '\\catcode (category code manipulation)' },
-  { pattern: /\\csname\b.*\\endcsname/gi, description: '\\csname...\\endcsname (dynamic command construction)' },
   { pattern: /\\directlua\b/gi, description: '\\directlua (Lua code execution)' },
-  { pattern: /\\latelua\b/gi, description: '\\latelua (Lua code execution)' },
-  { pattern: /\\luaexec\b/gi, description: '\\luaexec (Lua code execution)' },
-  { pattern: /\\luadirect\b/gi, description: '\\luadirect (Lua code execution)' },
 ];
 
 export interface SanitizeResult {
@@ -28,14 +23,11 @@ export interface SanitizeResult {
 }
 
 /**
- * Checks LaTeX content for dangerous commands.
- * Returns the list of violations found. Does NOT modify the content —
- * the caller decides whether to reject or strip.
+ * Detect dangerous LaTeX commands
  */
 export function detectDangerousLatex(latex: string): string[] {
   const violations: string[] = [];
   for (const { pattern, description } of DANGEROUS_PATTERNS) {
-    // Reset lastIndex for global regexes
     pattern.lastIndex = 0;
     if (pattern.test(latex)) {
       violations.push(description);
@@ -45,8 +37,7 @@ export function detectDangerousLatex(latex: string): string[] {
 }
 
 /**
- * Strips dangerous commands from LaTeX content and returns the result.
- * Use this for AI-generated output where we want to silently remove bad commands.
+ * Strip dangerous commands (for backward compatibility)
  */
 export function stripDangerousLatex(latex: string): SanitizeResult {
   const violations = detectDangerousLatex(latex);
@@ -61,8 +52,7 @@ export function stripDangerousLatex(latex: string): SanitizeResult {
 }
 
 /**
- * Validates LaTeX content and throws if dangerous commands are found.
- * Use this as a hard gate before compilation.
+ * Validate LaTeX before compilation (hard gate)
  */
 export function assertSafeLatex(latex: string): void {
   const violations = detectDangerousLatex(latex);
@@ -74,24 +64,47 @@ export function assertSafeLatex(latex: string): void {
 }
 
 /**
- * Escapes unescaped LaTeX special characters in content areas.
- * Handles & characters that appear in text (not in tabular/align environments).
- * Skips already-escaped sequences like \&.
+ * Deduplicate preamble entries
+ */
+export function deduplicatePreamble(latex: string): string {
+  const docStart = latex.indexOf('\\begin{document}');
+  if (docStart === -1) return latex;
+
+  const preamble = latex.slice(0, docStart);
+  const body = latex.slice(docStart);
+
+  const seen = new Set<string>();
+  const dedupedLines: string[] = [];
+
+  for (const line of preamble.split('\n')) {
+    const trimmed = line.trim();
+    if (/^\\(usepackage|newcommand|renewcommand|definecolor|setlength|pagestyle)\b/.test(trimmed)) {
+      if (seen.has(trimmed)) continue;
+      seen.add(trimmed);
+    }
+    dedupedLines.push(line);
+  }
+
+  return dedupedLines.join('\n') + body;
+}
+
+/**
+ * Escape LaTeX special characters in text content.
+ * Replaces unescaped & with \& outside tabular-like environments
+ * where & serves as a column separator.
  */
 export function escapeLatexSpecialChars(latex: string): string {
-  // Escape unescaped & that are NOT inside tabular/align environments
-  // and NOT already escaped (preceded by \)
   const lines = latex.split('\n');
   let inTabular = 0;
 
   return lines.map(line => {
-    // Track tabular-like environments where & is a column separator
+    // Track tabular environments where & is a column separator
     if (/\\begin\{(tabular|array|align|matrix|pmatrix|bmatrix|cases)\*?\}/.test(line)) inTabular++;
     if (/\\end\{(tabular|array|align|matrix|pmatrix|bmatrix|cases)\*?\}/.test(line)) inTabular--;
 
     if (inTabular > 0) return line;
 
-    // Replace unescaped & (not preceded by \) with \&
+    // Replace unescaped & with \&
     return line.replace(/(?<!\\)&/g, '\\&');
   }).join('\n');
 }

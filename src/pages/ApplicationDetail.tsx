@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { FileText, Download, ArrowLeft, RefreshCw, Save, Check } from 'lucide-react';
+import { FileText, Download, ArrowLeft, Save, Check } from 'lucide-react';
 import { format } from 'date-fns';
 
 interface Application {
@@ -48,7 +48,14 @@ export function ApplicationDetail() {
 
   if (!app) return <div className="p-8 text-text-secondary">Loading...</div>;
 
-  const log = JSON.parse(app.generationLog || '[]');
+  let rawLog: any = null;
+  let logParseError = false;
+  try {
+    rawLog = JSON.parse(app.generationLog || '{}');
+  } catch {
+    logParseError = true;
+  }
+  const isLegacy = Array.isArray(rawLog);
 
   return (
     <div className="space-y-6 max-w-5xl mx-auto">
@@ -98,21 +105,81 @@ export function ApplicationDetail() {
             </div>
           </section>
 
-          <section className="bg-bg-surface border border-border rounded p-6 space-y-4">
+           <section className="bg-bg-surface border border-border rounded p-6 space-y-4">
             <h2 className="text-sm font-medium text-text-secondary uppercase tracking-wider">Generation Log</h2>
-            <div className="space-y-4">
-              {log.map((entry: any, i: number) => (
-                <details key={i} className="group border border-border rounded-sm overflow-hidden">
+            {logParseError ? (
+              <p className="text-sm text-text-muted italic">Log unavailable</p>
+            ) : isLegacy ? (
+              <div className="space-y-4">
+                <span className="inline-block text-xs font-medium bg-bg-elevated text-text-secondary border border-border rounded px-2 py-0.5 uppercase tracking-wider">Legacy</span>
+                {(rawLog as any[]).map((entry: any, i: number) => (
+                  <details key={i} className="group border border-border rounded-sm overflow-hidden">
+                    <summary className="bg-bg-elevated p-4 cursor-pointer font-mono text-sm flex justify-between items-center text-text-secondary group-hover:text-accent transition-colors">
+                      <span>Pass {entry.pass}: {entry.critique?.split('\n')[0]?.substring(0, 60)}...</span>
+                      <span className="text-xs opacity-50">Click to expand</span>
+                    </summary>
+                    <div className="p-4 bg-bg-base border-t border-border font-mono text-xs text-text-muted whitespace-pre-wrap overflow-x-auto">
+                      {entry.critique}
+                    </div>
+                  </details>
+                ))}
+              </div>
+            ) : rawLog && rawLog.phase1 !== undefined ? (
+              <div className="space-y-4">
+                {rawLog.model && (
+                  <div className="flex items-center gap-4 text-xs text-text-muted">
+                    <span>Model: <span className="font-mono text-text-secondary">{rawLog.model}</span></span>
+                    {rawLog.timestamp && (
+                      <span>Generated: <span className="font-mono text-text-secondary">{format(new Date(rawLog.timestamp), 'MMM dd, yyyy HH:mm')}</span></span>
+                    )}
+                  </div>
+                )}
+                <details className="group border border-border rounded-sm overflow-hidden">
                   <summary className="bg-bg-elevated p-4 cursor-pointer font-mono text-sm flex justify-between items-center text-text-secondary group-hover:text-accent transition-colors">
-                    <span>Pass {entry.pass}: {entry.critique.split('\\n')[0].substring(0, 60)}...</span>
+                    <span>Phase 1: Analysis</span>
                     <span className="text-xs opacity-50">Click to expand</span>
                   </summary>
                   <div className="p-4 bg-bg-base border-t border-border font-mono text-xs text-text-muted whitespace-pre-wrap overflow-x-auto">
-                    {entry.critique}
+                    {rawLog.phase1 || 'No analysis content'}
                   </div>
                 </details>
-              ))}
-            </div>
+                <details className="group border border-border rounded-sm overflow-hidden">
+                  <summary className="bg-bg-elevated p-4 cursor-pointer font-mono text-sm flex justify-between items-center text-text-secondary group-hover:text-accent transition-colors">
+                    <span>Phase 2: Review</span>
+                    <span className="text-xs opacity-50">Click to expand</span>
+                  </summary>
+                  <div className="p-4 bg-bg-base border-t border-border font-mono text-xs text-text-muted whitespace-pre-wrap overflow-x-auto">
+                    {rawLog.phase2 || 'No review content'}
+                  </div>
+                </details>
+              </div>
+            ) : rawLog && rawLog.cvData !== undefined ? (
+              <div className="space-y-4">
+                <div className="flex items-center gap-4 text-xs text-text-muted">
+                  <span>Model: <span className="font-mono text-text-secondary">{rawLog.model || 'Unknown'}</span></span>
+                  {rawLog.timestamp && (
+                    <span>Generated: <span className="font-mono text-text-secondary">{format(new Date(rawLog.timestamp), 'MMM dd, yyyy HH:mm')}</span></span>
+                  )}
+                  {rawLog.targetLanguage && (
+                    <span>Target: <span className="font-mono text-text-secondary">{rawLog.targetLanguage}</span></span>
+                  )}
+                  {rawLog.detectedLanguage && (
+                    <span>Detected: <span className="font-mono text-text-secondary">{rawLog.detectedLanguage}</span></span>
+                  )}
+                </div>
+                <details className="group border border-border rounded-sm overflow-hidden">
+                  <summary className="bg-bg-elevated p-4 cursor-pointer font-mono text-sm flex justify-between items-center text-text-secondary group-hover:text-accent transition-colors">
+                    <span>CV Data</span>
+                    <span className="text-xs opacity-50">Click to expand</span>
+                  </summary>
+                  <div className="p-4 bg-bg-base border-t border-border font-mono text-xs text-text-muted whitespace-pre-wrap overflow-x-auto">
+                    {JSON.stringify(rawLog.cvData, null, 2)}
+                  </div>
+                </details>
+              </div>
+            ) : (
+              <p className="text-sm text-text-muted italic">Log unavailable</p>
+            )}
           </section>
         </div>
 

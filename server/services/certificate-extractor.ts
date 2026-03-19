@@ -114,7 +114,7 @@ export async function extractCertificateFromPDF(
     
     const model = ai.models;
     const response = await model.generateContent({
-      model: 'gemini-3.1-flash-lite-preview',
+      model: 'gemini-3-flash-preview',
       contents: [
         {
           role: 'user',

@@ -1,7 +1,8 @@
 import { useEffect, useState, useRef } from 'react';
-import { Save, Check, Loader2, Upload, Award, FileText, Trash2, CheckCircle, User, X, ChevronDown, ChevronRight, RotateCcw } from 'lucide-react';
+import { Save, Check, Loader2, Upload, Award, FileText, Trash2, CheckCircle, User, X, RotateCcw } from 'lucide-react';
 import { CertificateUpload, type ExtractionResult } from '../components/CertificateUpload';
 import { CertificatePreview, type Certificate } from '../components/CertificatePreview';
+import { ChatPanel } from '../components/ChatPanel';
 import { useDialog } from '../context/DialogContext';
 
 type SettingsTab = 'master-cv' | 'profile-picture' | 'certificates' | 'prompts';
@@ -37,15 +38,11 @@ export function Settings() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Prompt editor state
-  const PROMPT_KEYS = ['generator', 'critique', 'validation'] as const;
   const PROMPT_LABELS: Record<string, string> = {
-    'generator': 'Generator',
-    'critique': 'Critique',
-    'validation': 'Validation',
+    'generator': 'Generation Prompt',
   };
   const [prompts, setPrompts] = useState<Record<string, string>>({});
   const [promptDefaults, setPromptDefaults] = useState<Record<string, string>>({});
-  const [expandedPrompt, setExpandedPrompt] = useState<string | null>(null);
   const [savingPrompts, setSavingPrompts] = useState(false);
 
   useEffect(() => {
@@ -290,7 +287,7 @@ export function Settings() {
       const res = await fetch('/api/settings/prompts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(prompts),
+        body: JSON.stringify({ generator: prompts['generator'] || '' }),
       });
       if (res.ok) {
         toast('Prompts saved successfully', 'success');
@@ -304,16 +301,16 @@ export function Settings() {
     }
   };
 
-  const handleResetPrompt = async (key: string) => {
+  const handleResetPrompt = async () => {
     const confirmed = await confirm({
       title: 'Reset Prompt',
-      message: `Reset "${PROMPT_LABELS[key]}" to its default? Your customizations will be lost.`,
+      message: `Reset "${PROMPT_LABELS['generator']}" to its default? Your customizations will be lost.`,
       confirmText: 'Reset',
       cancelText: 'Cancel',
       severity: 'destructive',
     });
     if (!confirmed) return;
-    setPrompts(prev => ({ ...prev, [key]: promptDefaults[key] }));
+    setPrompts(prev => ({ ...prev, generator: promptDefaults['generator'] }));
   };
 
   const handleDeleteCertificate = async (certId: string) => {
@@ -630,9 +627,9 @@ export function Settings() {
         <section className={`bg-bg-surface border border-border rounded p-8 space-y-4${activeSection !== 'prompts' ? ' hidden' : ''}`}>
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-lg font-serif text-text-primary">Generation Prompts</h2>
+              <h2 className="text-lg font-serif text-text-primary">Generation Prompt</h2>
               <p className="text-sm text-text-secondary mt-1">
-                Customize the prompts used in each stage of the CV generation pipeline.
+                Customize the consolidated prompt used for CV generation. This single prompt guides the LLM through analysis, review, and LaTeX output phases.
               </p>
             </div>
             <button
@@ -646,49 +643,25 @@ export function Settings() {
           </div>
 
           <div className="space-y-2">
-            {PROMPT_KEYS.map(key => {
-              const isExpanded = expandedPrompt === key;
-              const isModified = promptDefaults[key] && prompts[key] !== promptDefaults[key];
-              return (
-                <div key={key} className="border border-border rounded">
-                  <button
-                    type="button"
-                    onClick={() => setExpandedPrompt(isExpanded ? null : key)}
-                    className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-bg-base transition-colors"
-                  >
-                    <div className="flex items-center gap-2">
-                      {isExpanded ? <ChevronDown size={16} className="text-text-secondary" /> : <ChevronRight size={16} className="text-text-secondary" />}
-                      <span className="text-sm font-medium text-text-primary">{PROMPT_LABELS[key]}</span>
-                      {isModified && (
-                        <span className="text-xs bg-accent/20 text-accent px-2 py-0.5 rounded">customized</span>
-                      )}
-                    </div>
-                  </button>
-                  {isExpanded && (
-                    <div className="px-4 pb-4 space-y-2">
-                      <textarea
-                        rows={15}
-                        value={prompts[key] || ''}
-                        onChange={e => setPrompts(prev => ({ ...prev, [key]: e.target.value }))}
-                        className="w-full bg-bg-base border border-border rounded-sm p-4 text-text-primary focus:outline-none focus:border-accent transition-colors font-mono text-sm whitespace-pre-wrap resize-y"
-                        spellCheck={false}
-                      />
-                      {isModified && (
-                        <button
-                          type="button"
-                          onClick={() => handleResetPrompt(key)}
-                          className="flex items-center gap-1 text-xs text-text-secondary hover:text-accent transition-colors"
-                        >
-                          <RotateCcw size={12} />
-                          Reset to default
-                        </button>
-                      )}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
+            <textarea
+              rows={15}
+              value={prompts['generator'] || ''}
+              onChange={e => setPrompts(prev => ({ ...prev, generator: e.target.value }))}
+              className="w-full bg-bg-base border border-border rounded-sm p-4 text-text-primary focus:outline-none focus:border-accent transition-colors font-mono text-sm whitespace-pre-wrap resize-y"
+              spellCheck={false}
+            />
+            {promptDefaults['generator'] && prompts['generator'] !== promptDefaults['generator'] && (
+              <button
+                type="button"
+                onClick={() => handleResetPrompt()}
+                className="flex items-center gap-1 text-xs text-text-secondary hover:text-accent transition-colors"
+              >
+                <RotateCcw size={12} />
+                Reset to default
+              </button>
+            )}
           </div>
+          <ChatPanel />
         </section>
       </div>
     </div>

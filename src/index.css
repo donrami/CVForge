@@ -1,22 +1,22 @@
 @import "tailwindcss";
 
 @theme {
-  --color-bg-base: #0f0f0f;
-  --color-bg-surface: #181818;
-  --color-bg-elevated: #222222;
-  --color-border: #2e2e2e;
-  --color-text-primary: #f0ede8;
-  --color-text-secondary: #8a8680;
-  --color-text-muted: #4a4845;
-  --color-accent: #c8a96e;
-  --color-accent-hover: #d4b97e;
-  --color-status-generated: #4a7fa5;
-  --color-status-applied: #5a8f6a;
-  --color-status-interview: #c8a96e;
-  --color-status-offer: #6abf8a;
-  --color-status-rejected: #8a4a4a;
-  --color-status-withdrawn: #4a4845;
-  --color-destructive: #a05050;
+--color-bg-base: rgb(15, 15, 15);
+  --color-bg-surface: rgb(24, 24, 24);
+  --color-bg-elevated: rgb(34, 34, 34);
+  --color-border: rgb(46, 46, 46);
+  --color-text-primary: rgb(240, 237, 232);
+  --color-text-secondary: rgb(138, 134, 128);
+  --color-text-muted: rgb(74, 72, 69);
+  --color-accent: rgb(200, 169, 110);
+  --color-accent-hover: rgb(212, 185, 126);
+  --color-status-generated: rgb(74, 127, 165);
+  --color-status-applied: rgb(90, 143, 106);
+  --color-status-interview: rgb(200, 169, 110);
+  --color-status-offer: rgb(106, 191, 138);
+  --color-status-rejected: rgb(138, 74, 74);
+  --color-status-withdrawn: rgb(74, 72, 69);
+  --color-destructive: rgb(160, 80, 80);
   
   --font-sans: "DM Sans", ui-sans-serif, system-ui, sans-serif;
   --font-serif: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
@@ -26,6 +26,11 @@
 @keyframes flash-highlight {
   0%, 100% { background-color: transparent; box-shadow: none; }
   50% { background-color: rgba(200, 169, 110, 0.15); box-shadow: inset 0 0 0 2px #c8a96e; }
+}
+
+@keyframes grow {
+  0% { width: 60%; }
+  100% { width: 100%; }
 }
 
 .flash-highlight {

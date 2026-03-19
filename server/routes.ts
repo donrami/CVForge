@@ -375,3 +375,74 @@ apiRouter.post('/settings/prompts', requireAuth, async (req, res) => {
 apiRouter.get('/settings/prompts/defaults', requireAuth, (_req, res) => {
   res.json(getDefaults());
 });
+
+// Chat Assistant
+apiRouter.post('/prompts/chat', requireAuth, async (req, res) => {
+  const { messages, includeFullContext } = req.body;
+
+  if (!Array.isArray(messages) || messages.length === 0) {
+    return res.status(400).json({ error: 'messages array is required' });
+  }
+
+  try {
+    // Always include a brief system prompt explaining the app
+    const briefSystemPrompt = `You are CVForge Assistant, a helpful AI that helps users with their CV generation pipeline.
+
+CVForge is a tool that generates tailored CVs using AI. It uses a consolidated prompt with three phases:
+1. Analysis - Analyzes job requirements and candidate background
+2. Review - Verifies quality and accuracy
+3. LaTeX - Produces the final compilable CV
+
+Be conversational, friendly, and helpful. Keep responses concise unless detailed analysis is requested.`;
+
+    // Only inject full prompt when explicitly requested via includeFullContext flag
+    let systemInstruction: string;
+
+    if (includeFullContext === true) {
+      // User explicitly requested full prompt context
+      const prompts = await loadAllPrompts();
+      
+      const lineCount = (text: string) => text.split('\n').length;
+      const generatorLines = lineCount(prompts.generator);
+
+      systemInstruction = `You are a CVForge Assistant that helps users understand and improve their CV generation pipeline.
+
+The pipeline uses a single consolidated prompt with three phases:
+1. Phase 1: Analysis — Reasons about the job-candidate match and identifies relevant experience.
+2. Phase 2: Review — Verifies the generated CV for quality issues.
+3. Phase 3: LaTeX — Produces the final compilable LaTeX output.
+
+--- PROMPT METADATA ---
+- Generator Prompt: ${generatorLines} lines
+
+--- FULL PROMPT CONTENTS ---
+
+## Generator Prompt:
+${prompts.generator}
+
+---
+
+When answering questions about the prompt, use the metadata above for statistics.
+When suggesting modifications, wrap full replacements in code blocks.`;
+    } else {
+      // Default: brief system prompt only (no keyword matching needed)
+      systemInstruction = briefSystemPrompt;
+    }
+
+    const contents = messages.map((msg: { role: string; content: string }) => ({
+      role: msg.role === 'assistant' ? 'model' : 'user',
+      parts: [{ text: msg.content }],
+    }));
+
+    const result = await ai.models.generateContent({
+      model: 'gemini-3-flash-preview',
+      config: { systemInstruction },
+      contents,
+    });
+
+    const responseText = result.text ?? '';
+    res.json({ response: responseText });
+  } catch (e) {
+    errorResponse(res, 500, e);
+  }
+});

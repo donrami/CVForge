@@ -36,20 +36,13 @@ FROM node:22-alpine AS runner
 WORKDIR /app
 
 # Install required system dependencies:
-# - LaTeX for PDF compilation
-# - GraphicsMagick for image processing (pdf2pic dependency)
-# - poppler-utils for PDF-to-image conversion (pdftoppm)
-# - tesseract-ocr for OCR text extraction
+# - LaTeX for PDF compilation only
+# Removed: graphicsmagick, poppler-utils, tesseract-ocr (now using Gemini Vision)
 RUN apk add --no-cache \
     texlive \
     texlive-luatex \
     texlive-xetex \
     texmf-dist \
-    graphicsmagick \
-    poppler-utils \
-    tesseract-ocr \
-    tesseract-ocr-data-eng \
-    tesseract-ocr-data-deu \
     && rm -rf /var/cache/apk/*
 
 ENV NODE_ENV=production
