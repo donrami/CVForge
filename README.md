@@ -29,7 +29,6 @@ CVForge is a personal, self-hosted AI-powered CV generator and job application t
 1. Clone the repository
 2. Copy `.env.example` to `.env` and fill in your values:
    - `GEMINI_API_KEY` — Google Gemini API key
-   - `AUTH_PASSWORD_HASH` — bcrypt hash of your master password
    - `DATABASE_URL` — PostgreSQL connection string (default works with Docker Compose)
 3. Start with Docker Compose:
    ```bash
@@ -68,9 +67,9 @@ npm run dev
 │       ├── prompts.ts                # File-based prompt management (single generator prompt)
 │       └── logger.ts                 # Pino logger
 ├── src/                   # React frontend
-│   ├── pages/             # Dashboard, NewApplication, ApplicationDetail, Settings, Login
+│   ├── pages/             # Dashboard, NewApplication, ApplicationDetail, Settings
 │   ├── components/        # UI components, dialogs, layout
-│   └── context/           # Auth and dialog context providers
+│   └── context/           # Dialog context providers
 ├── context/               # User context files (master CV, certificates, prompts)
 ├── prisma/schema.prisma   # Database schema
 ├── generated/             # Runtime output (LaTeX + PDF per application)
@@ -90,7 +89,7 @@ All configuration happens in the Settings page:
 
 - `.env`, `context/`, `generated/`, and `uploads/` are all gitignored — never commit these
 - LaTeX output is sanitized before compilation (no shell escape, no file I/O commands)
-- The app is designed for single-user local/self-hosted use behind a master password
+- The app is designed for single-user local/self-hosted use
 
 ## License
 

@@ -40,9 +40,9 @@ src/                              # React SPA frontend
     NewApplication.tsx            # Form: company name, job title, job description, target language (EN/DE), additional context. Streams generation progress via SSE.
     ApplicationDetail.tsx         # View application details, download PDF/TEX, update status/notes/dates, regenerate with additional context.
     Settings.tsx                  # Tabs: Master CV editor, Certificate management (upload/extract/edit/sync), Profile image upload, Prompt editor (generator with reset-to-defaults).
-    Login.tsx                     # Master password authentication.
+    Login.tsx                     # (Removed — no auth needed for self-hosted use)
   components/                     # UI components, dialogs, layout wrapper.
-  context/                        # React context providers for auth and dialog state.
+  context/                        # React context providers for dialog state.
 
 context/                          # User context files (gitignored, persisted via Docker volumes)
   master-cv.tex                   # The user's base LaTeX CV template — source of truth for all generations. German-language, uses LuaLaTeX with fontspec, paracol two-column layout, Roboto font.
@@ -148,8 +148,7 @@ When `/api/applications/:id/download/pdf` is called:
 
 ## Security Model
 
-- Single-user app, master password auth (bcrypt hash in .env)
-- No-op auth middleware in current codebase (app runs locally)
+- Single-user self-hosted app, no authentication required
 - LaTeX sanitization: blocks \write18, \input, \include, \directlua, \openout, \catcode, etc.
 - `--no-shell-escape` flag on LaTeX compilation
 - File upload validation: type whitelist, size limits
