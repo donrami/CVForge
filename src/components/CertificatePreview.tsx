@@ -126,9 +126,9 @@ export function CertificatePreview({ results, onSave, onCancel, saving = false }
   };
 
   const getConfidenceColor = (confidence: number) => {
-    if (confidence >= 0.8) return 'text-green-500';
-    if (confidence >= 0.5) return 'text-yellow-500';
-    return 'text-red-500';
+    if (confidence >= 0.8) return 'text-success';
+    if (confidence >= 0.5) return 'text-warning';
+    return 'text-destructive';
   };
 
   return (
@@ -156,9 +156,9 @@ export function CertificatePreview({ results, onSave, onCancel, saving = false }
 
       {/* Failed extractions warning */}
       {failedExtractions.length > 0 && (
-        <div className="bg-yellow-500/10 border border-yellow-500/30 rounded p-4">
+        <div className="bg-warning/10 border border-warning/30 p-4">
           <div className="flex items-start gap-3">
-            <AlertTriangle className="text-yellow-500 flex-shrink-0" size={20} />
+            <AlertTriangle className="text-warning shrink-0" size={20} />
             <div className="flex-1">
               <p className="text-sm text-text-primary font-medium">
                 Some files could not be processed
@@ -185,7 +185,7 @@ export function CertificatePreview({ results, onSave, onCancel, saving = false }
           {certificates.map((cert, index) => (
             <div
               key={index}
-              className="bg-bg-surface border border-border rounded-lg p-6 space-y-4"
+              className="bg-bg-surface border border-border p-6 space-y-4 surface-card"
             >
               {/* Certificate header */}
               <div className="flex items-start justify-between">
@@ -203,7 +203,7 @@ export function CertificatePreview({ results, onSave, onCancel, saving = false }
                 </div>
                 <button
                   onClick={() => removeCertificate(index)}
-                  className="text-text-secondary hover:text-red-500 transition-colors"
+                  className="text-text-secondary hover:text-destructive transition-colors"
                 >
                   <Trash2 size={18} />
                 </button>
@@ -220,7 +220,7 @@ export function CertificatePreview({ results, onSave, onCancel, saving = false }
                     value={cert.name}
                     onChange={e => updateCertificate(index, 'name', e.target.value)}
                     placeholder="e.g., AWS Certified Solutions Architect"
-                    className="w-full bg-bg-base border border-border rounded px-3 py-2 text-text-primary focus:outline-none focus:border-accent"
+                    className="w-full bg-bg-base border border-border px-3 py-2 text-text-primary focus:outline-none focus:border-accent"
                   />
                 </div>
 
@@ -233,7 +233,7 @@ export function CertificatePreview({ results, onSave, onCancel, saving = false }
                     value={cert.issuer}
                     onChange={e => updateCertificate(index, 'issuer', e.target.value)}
                     placeholder="e.g., Amazon Web Services"
-                    className="w-full bg-bg-base border border-border rounded px-3 py-2 text-text-primary focus:outline-none focus:border-accent"
+                    className="w-full bg-bg-base border border-border px-3 py-2 text-text-primary focus:outline-none focus:border-accent"
                   />
                 </div>
 
@@ -246,7 +246,7 @@ export function CertificatePreview({ results, onSave, onCancel, saving = false }
                     value={cert.issueDate || ''}
                     onChange={e => updateCertificate(index, 'issueDate', e.target.value)}
                     placeholder="e.g., May 2023"
-                    className="w-full bg-bg-base border border-border rounded px-3 py-2 text-text-primary focus:outline-none focus:border-accent"
+                    className="w-full bg-bg-base border border-border px-3 py-2 text-text-primary focus:outline-none focus:border-accent"
                   />
                 </div>
 
@@ -259,7 +259,7 @@ export function CertificatePreview({ results, onSave, onCancel, saving = false }
                     value={cert.expiryDate || ''}
                     onChange={e => updateCertificate(index, 'expiryDate', e.target.value)}
                     placeholder="e.g., May 2026 (leave empty if no expiry)"
-                    className="w-full bg-bg-base border border-border rounded px-3 py-2 text-text-primary focus:outline-none focus:border-accent"
+                    className="w-full bg-bg-base border border-border px-3 py-2 text-text-primary focus:outline-none focus:border-accent"
                   />
                 </div>
 
@@ -272,7 +272,7 @@ export function CertificatePreview({ results, onSave, onCancel, saving = false }
                     value={cert.credentialId || ''}
                     onChange={e => updateCertificate(index, 'credentialId', e.target.value)}
                     placeholder="e.g., AWS-123456789"
-                    className="w-full bg-bg-base border border-border rounded px-3 py-2 text-text-primary focus:outline-none focus:border-accent"
+                    className="w-full bg-bg-base border border-border px-3 py-2 text-text-primary focus:outline-none focus:border-accent"
                   />
                 </div>
 
@@ -285,7 +285,7 @@ export function CertificatePreview({ results, onSave, onCancel, saving = false }
                     onChange={e => updateCertificate(index, 'description', e.target.value)}
                     placeholder="Brief description of what this certification validates..."
                     rows={2}
-                    className="w-full bg-bg-base border border-border rounded px-3 py-2 text-text-primary focus:outline-none focus:border-accent resize-y"
+                    className="w-full bg-bg-base border border-border px-3 py-2 text-text-primary focus:outline-none focus:border-accent resize-y"
                   />
                 </div>
 
@@ -298,7 +298,7 @@ export function CertificatePreview({ results, onSave, onCancel, saving = false }
                     {cert.skills.map((skill, skillIndex) => (
                       <div
                         key={skillIndex}
-                        className="flex items-center gap-1 bg-bg-base border border-border rounded px-2 py-1"
+                        className="flex items-center gap-1 bg-bg-base border border-border px-2 py-1"
                       >
                         <input
                           type="text"
@@ -309,7 +309,7 @@ export function CertificatePreview({ results, onSave, onCancel, saving = false }
                         />
                         <button
                           onClick={() => removeSkill(index, skillIndex)}
-                          className="text-text-secondary hover:text-red-500"
+                          className="text-text-secondary hover:text-destructive"
                         >
                           ×
                         </button>
@@ -317,7 +317,7 @@ export function CertificatePreview({ results, onSave, onCancel, saving = false }
                     ))}
                     <button
                       onClick={() => addSkill(index)}
-                      className="text-sm text-accent hover:text-accent-hover border border-dashed border-accent/50 rounded px-3 py-1 transition-colors"
+                      className="text-sm text-accent hover:text-accent-hover border border-dashed border-accent/50 px-3 py-1 transition-colors"
                     >
                       + Add Skill
                     </button>
@@ -341,11 +341,11 @@ export function CertificatePreview({ results, onSave, onCancel, saving = false }
                             value={activity}
                             onChange={e => updateActivity(index, activityIndex, e.target.value)}
                             placeholder="e.g., Developed REST APIs for customer portal"
-                            className="flex-1 bg-bg-base border border-border rounded px-3 py-2 text-sm text-text-primary focus:outline-none focus:border-accent"
+                            className="flex-1 bg-bg-base border border-border px-3 py-2 text-sm text-text-primary focus:outline-none focus:border-accent"
                           />
                           <button
                             onClick={() => removeActivity(index, activityIndex)}
-                            className="text-text-secondary hover:text-red-500 flex-shrink-0"
+                            className="text-text-secondary hover:text-destructive shrink-0"
                           >
                             ×
                           </button>
@@ -353,7 +353,7 @@ export function CertificatePreview({ results, onSave, onCancel, saving = false }
                       ))}
                       <button
                         onClick={() => addActivity(index)}
-                        className="text-sm text-accent hover:text-accent-hover border border-dashed border-accent/50 rounded px-3 py-1 transition-colors"
+                        className="text-sm text-accent hover:text-accent-hover border border-dashed border-accent/50 px-3 py-1 transition-colors"
                       >
                         + Add Activity
                       </button>
@@ -381,14 +381,14 @@ export function CertificatePreview({ results, onSave, onCancel, saving = false }
         <button
           onClick={onCancel}
           disabled={saving}
-          className="px-6 py-2 text-text-secondary hover:text-text-primary transition-colors disabled:opacity-50"
+          className="flex items-center gap-2 bg-bg-elevated border border-border hover:bg-border text-text-primary font-medium px-6 py-2.5 transition-colors disabled:opacity-50"
         >
           Cancel
         </button>
         <button
           onClick={() => onSave(certificates)}
           disabled={saving || certificates.length === 0}
-          className="flex items-center gap-2 bg-accent hover:bg-accent-hover text-bg-base font-medium px-6 py-2 rounded transition-colors disabled:opacity-50"
+          className="flex items-center gap-2 bg-accent hover:bg-accent-hover text-text-on-accent font-medium px-6 py-2.5 transition-colors disabled:opacity-50"
         >
           {saving ? (
             <>

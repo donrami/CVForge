@@ -111,128 +111,136 @@ export function NewApplication() {
     }
   };
 
+  const labelClass = "block font-mono text-[11px] uppercase tracking-wider text-text-secondary mb-2";
+  const inputClass = "w-full bg-bg-base border border-border px-4 py-3 text-text-primary focus:outline-none focus:border-accent transition-colors inset-surface";
+
   return (
     <div className="max-w-2xl mx-auto space-y-8">
-      <div>
-        <h1 className="text-4xl font-serif text-text-primary tracking-tight mb-2">New Application</h1>
-        <p className="text-text-secondary">Generate a tailored CV for a specific job description.</p>
+      <div className="pb-6 border-b border-border">
+        <h1 className="text-[2.5rem] font-serif text-text-primary tracking-tight leading-tight">New Application</h1>
+        <p className="text-text-secondary mt-1">Generate a tailored CV for a specific job description</p>
       </div>
 
       {loading ? (
-        <div className="bg-bg-surface border border-border rounded-lg overflow-hidden">
+        <div className="bg-bg-surface border border-border overflow-hidden surface-card">
           <div className="px-8 pt-8 pb-6 space-y-6">
-            {/* Header */}
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <Loader2 className="animate-spin text-accent" size={20} />
                 <span className="font-serif text-xl text-text-primary">
                   {phase === 'preparing' && 'Preparing...'}
-                  {phase === 'ai-working' && 'AI is crafting your CV'}
+                  {phase === 'ai-working' && 'Forging CV'}
                   {phase === 'finalizing' && 'Wrapping up...'}
                 </span>
               </div>
               <ElapsedTimer />
             </div>
 
-            {/* Preparing phase */}
             {phase === 'preparing' && (
               <div className="py-4 animate-pulse">
                 <p className="text-sm text-text-secondary">Assembling your profile and job context...</p>
               </div>
             )}
 
-            {/* AI working phase — the main event */}
             {phase === 'ai-working' && (
               <div>
                 <div className="flex justify-between mb-1.5">
-                  <span className="text-xs text-text-secondary font-mono">Generating LaTeX...</span>
+                  <span className="text-xs text-text-secondary font-mono">
+                    {aiChars === 0 ? 'Analyzing requirements' : 'Generating LaTeX'}<span className="animate-dots" />
+                  </span>
                   <span className="text-xs text-text-muted font-mono tabular-nums">
                     {(aiChars / 1000).toFixed(1)}k chars
                   </span>
                 </div>
-                <div className="h-1.5 bg-bg-elevated rounded-full overflow-hidden">
+                <div className="h-1 bg-bg-elevated overflow-hidden">
                   <div
-                    className="h-full bg-accent rounded-full transition-all duration-700 ease-out"
+                    className="h-full bg-accent transition-all duration-700 ease-out"
                     style={{ width: `${Math.min((aiChars / 8000) * 100, 95)}%` }}
                   />
                 </div>
               </div>
             )}
 
-            {/* Finalizing phase */}
             {phase === 'finalizing' && (
               <div className="py-4">
                 <p className="text-sm text-text-secondary">Compiling LaTeX and saving your application...</p>
-                <div className="mt-3 h-1.5 bg-bg-elevated rounded-full overflow-hidden max-w-sm">
-                  <div className="h-full bg-accent rounded-full animate-[grow_2s_ease-out_forwards]" />
+                <div className="mt-3 h-1 bg-bg-elevated overflow-hidden max-w-sm">
+                  <div className="h-full bg-accent animate-[grow_2s_ease-out_forwards]" />
                 </div>
               </div>
             )}
 
-            {/* Error */}
             {error && (
-              <div className="p-4 bg-destructive/10 border border-destructive/30 rounded text-sm text-destructive">
+              <div className="p-4 bg-destructive/10 border border-destructive/30 text-sm text-destructive">
                 {error}
               </div>
             )}
           </div>
         </div>
       ) : (
-        <form onSubmit={handleSubmit} className="space-y-6 bg-bg-surface border border-border rounded p-8">
+        <form onSubmit={handleSubmit} className="space-y-6 bg-bg-surface border border-border p-8 surface-card">
           <div className="grid grid-cols-2 gap-6">
-            <div className="space-y-2">
-              <label className="block text-sm font-medium text-text-secondary uppercase tracking-wider">Company Name</label>
+            <div>
+              <label className={labelClass}>Company Name</label>
               <input 
                 required
                 type="text" 
                 value={formData.companyName}
                 onChange={e => setFormData({...formData, companyName: e.target.value})}
-                className="w-full bg-bg-base border border-border rounded-sm px-4 py-2 text-text-primary focus:outline-none focus:border-accent transition-colors"
+                className={inputClass}
               />
             </div>
-            <div className="space-y-2">
-              <label className="block text-sm font-medium text-text-secondary uppercase tracking-wider">Job Title</label>
+            <div>
+              <label className={labelClass}>Job Title</label>
               <input 
                 required
                 type="text" 
                 value={formData.jobTitle}
                 onChange={e => setFormData({...formData, jobTitle: e.target.value})}
-                className="w-full bg-bg-base border border-border rounded-sm px-4 py-2 text-text-primary focus:outline-none focus:border-accent transition-colors"
+                className={inputClass}
               />
             </div>
           </div>
 
-          <div className="space-y-2">
-            <label className="block text-sm font-medium text-text-secondary uppercase tracking-wider">Job Description</label>
+          <div>
+            <label className={labelClass}>Job Description</label>
             <textarea 
               required
               rows={8}
               value={formData.jobDescription}
               onChange={e => setFormData({...formData, jobDescription: e.target.value})}
-              className="w-full bg-bg-base border border-border rounded-sm px-4 py-3 text-text-primary focus:outline-none focus:border-accent transition-colors resize-y font-sans"
+              className={`${inputClass} min-h-[200px] resize-y font-mono text-sm`}
               placeholder="Paste the full job description here..."
             />
           </div>
 
-          <div className="space-y-2">
-            <label className="block text-sm font-medium text-text-secondary uppercase tracking-wider">Target Language</label>
-            <select
-              value={formData.targetLanguage}
-              onChange={e => setFormData({...formData, targetLanguage: e.target.value})}
-              className="w-full h-[42px] bg-bg-base border border-border rounded-sm px-4 py-2 text-text-primary focus:outline-none focus:border-accent transition-colors appearance-none"
-            >
-              <option value="EN">English (EN)</option>
-              <option value="DE">German (DE)</option>
-            </select>
+          <div>
+            <label className={labelClass}>Target Language</label>
+            <div className="flex gap-0">
+              {['EN', 'DE'].map(lang => (
+                <button
+                  key={lang}
+                  type="button"
+                  onClick={() => setFormData({...formData, targetLanguage: lang})}
+                  className={`px-4 py-2 font-mono text-sm border transition-colors ${
+                    formData.targetLanguage === lang
+                      ? 'bg-accent text-text-on-accent border-accent'
+                      : 'bg-transparent text-text-secondary border-border hover:text-text-primary'
+                  }`}
+                >
+                  {lang}
+                </button>
+              ))}
+            </div>
           </div>
 
-          <div className="space-y-2">
-            <label className="block text-sm font-medium text-text-secondary uppercase tracking-wider">Additional Context (Optional)</label>
+          <div>
+            <label className={labelClass}>Additional Context (Optional)</label>
             <textarea 
               rows={3}
               value={formData.additionalContext}
               onChange={e => setFormData({...formData, additionalContext: e.target.value})}
-              className="w-full bg-bg-base border border-border rounded-sm px-4 py-3 text-text-primary focus:outline-none focus:border-accent transition-colors resize-y font-sans"
+              className={`${inputClass} resize-y`}
               placeholder="E.g., Emphasize my React experience, ignore my early PHP roles."
             />
           </div>
@@ -242,14 +250,14 @@ export function NewApplication() {
               type="button"
               onClick={handleLoadLast}
               disabled={loadingLast}
-              className="flex items-center gap-2 bg-[#6a8a9a] hover:bg-[#7a9aaa] text-bg-base font-medium px-5 py-2.5 rounded transition-colors disabled:opacity-50"
+              className="flex items-center gap-2 px-5 py-2.5 border border-border text-text-secondary font-mono text-xs uppercase tracking-wider hover:text-text-primary transition-colors disabled:opacity-40"
             >
               {loadingLast ? <Loader2 className="animate-spin" size={16} /> : <RotateCcw size={16} />}
               Load Last
             </button>
             <button 
               type="submit"
-              className="flex items-center gap-2 bg-accent hover:bg-accent-hover text-bg-base font-medium px-6 py-2.5 rounded transition-colors"
+              className="flex items-center gap-2 bg-accent hover:bg-accent-hover text-text-on-accent font-medium px-6 py-2.5 transition-colors"
             >
               Generate CV
               <ArrowRight size={18} />

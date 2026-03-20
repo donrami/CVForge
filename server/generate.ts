@@ -75,6 +75,10 @@ const handleGenerate = async (req: any, res: any) => {
     };
     const masterCv = await readContextFile('master-cv.tex');
     const certs = await readContextFile('certificates.md');
+    const instructions = await readContextFile('instructions.md');
+    if (!instructions || instructions.trim().length === 0) {
+      logger.debug('instructions.md not found or empty — skipping optional context');
+    }
 
      const generationContext = `
 MASTER CV (SOURCE OF TRUTH):
@@ -82,7 +86,7 @@ ${masterCv}
 
 CERTIFICATES:
 ${certs}
-
+${instructions && instructions.trim().length > 0 ? `\nPERSONAL INSTRUCTIONS:\n${instructions}\n` : ''}
 JOB DESCRIPTION:
 ${jobDescription}
 

@@ -123,7 +123,7 @@ export function CertificateUpload({ onExtracted }: CertificateUploadProps) {
         onDrop={handleDrop}
         onClick={() => fileInputRef.current?.click()}
         className={`
-          border-2 border-dashed rounded-lg p-8 text-center cursor-pointer
+          border-2 border-dashed p-8 text-center cursor-pointer
           transition-colors duration-200
           ${isDragging 
             ? 'border-accent bg-accent/5' 
@@ -150,7 +150,7 @@ export function CertificateUpload({ onExtracted }: CertificateUploadProps) {
 
       {/* File list */}
       {files.length > 0 && (
-        <div className="bg-bg-surface border border-border rounded-lg p-4 space-y-2">
+        <div className="bg-bg-surface border border-border p-4 space-y-2">
           <div className="flex justify-between items-center mb-2">
             <span className="text-sm text-text-secondary">
               {files.length} file{files.length !== 1 ? 's' : ''} selected
@@ -166,9 +166,9 @@ export function CertificateUpload({ onExtracted }: CertificateUploadProps) {
           {files.map((file, index) => (
             <div
               key={index}
-              className="flex items-center gap-3 bg-bg-base p-3 rounded border border-border"
+              className="flex items-center gap-3 bg-bg-base p-3 border border-border"
             >
-              <File className="text-accent flex-shrink-0" size={20} />
+              <File className="text-accent shrink-0" size={20} />
               <div className="flex-1 min-w-0">
                 <p className="text-sm text-text-primary truncate">{file.name}</p>
                 <p className="text-xs text-text-secondary">{formatFileSize(file.size)}</p>
@@ -176,7 +176,7 @@ export function CertificateUpload({ onExtracted }: CertificateUploadProps) {
               <button
                 onClick={() => removeFile(index)}
                 disabled={isProcessing}
-                className="text-text-secondary hover:text-red-500 transition-colors disabled:opacity-50"
+                className="text-text-secondary hover:text-destructive transition-colors disabled:opacity-50"
               >
                 <X size={18} />
               </button>
@@ -187,7 +187,7 @@ export function CertificateUpload({ onExtracted }: CertificateUploadProps) {
 
       {/* Error message */}
       {error && (
-        <div className="flex items-center gap-2 text-red-500 text-sm bg-red-500/10 p-3 rounded">
+        <div className="flex items-center gap-2 text-destructive text-sm bg-destructive-subtle p-3">
           <AlertCircle size={16} />
           {error}
         </div>
@@ -198,7 +198,7 @@ export function CertificateUpload({ onExtracted }: CertificateUploadProps) {
         <button
           onClick={processFiles}
           disabled={isProcessing}
-          className="w-full flex items-center justify-center gap-2 bg-accent hover:bg-accent-hover text-bg-base font-medium py-3 rounded transition-colors disabled:opacity-50"
+          className="w-full flex items-center justify-center gap-2 bg-accent hover:bg-accent-hover text-text-on-accent font-medium py-2.5 transition-colors disabled:opacity-50"
         >
           {isProcessing ? (
             <>

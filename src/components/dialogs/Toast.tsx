@@ -63,14 +63,14 @@ function ToastItem({
 
   return (
     <div
-      className={`flex items-center gap-3 px-4 py-3 bg-bg-surface border-l-2 ${config.borderColor} rounded-sm shadow-lg animate-in slide-in-from-right-full duration-300`}
+      className={`flex items-center gap-3 px-4 py-3 bg-bg-surface border-l-2 ${config.borderColor} shadow-lg animate-in slide-in-from-right-full duration-300`}
       role="alert"
     >
-      <Icon className={`w-5 h-5 ${config.iconColor} flex-shrink-0`} />
+      <Icon className={`w-5 h-5 ${config.iconColor} shrink-0`} />
       <p className="flex-1 text-sm text-text-primary">{toast.message}</p>
       <button
         onClick={handleRemove}
-        className="flex-shrink-0 text-text-muted hover:text-text-secondary transition-colors"
+        className="shrink-0 text-text-muted hover:text-text-secondary transition-colors"
         aria-label="Close notification"
       >
         <X className="w-4 h-4" />

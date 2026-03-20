@@ -47,7 +47,7 @@ export function ChatPanel() {
       const res = await fetch('/api/prompts/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: updatedMessages }),
+        body: JSON.stringify({ messages: updatedMessages, includeFullContext: true }),
       });
 
       const data = await res.json();
@@ -91,10 +91,10 @@ export function ChatPanel() {
   };
 
   return (
-    <div className="border border-border rounded bg-bg-surface">
+    <div className="border border-border bg-bg-surface surface-card">
       {/* Header with clear button */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-border">
-        <div className="flex items-center gap-2 text-sm font-medium text-text-primary">
+        <div className="flex items-center gap-2 text-sm text-text-primary">
           <MessageSquare size={16} className="text-accent" />
           Prompt Assistant
         </div>
@@ -127,9 +127,9 @@ export function ChatPanel() {
                 return (
                   <div
                     key={i}
-                    className="flex items-start gap-2 px-3 py-2 rounded bg-destructive/10 border border-destructive/30 text-sm"
+                    className="flex items-start gap-2 px-3 py-2 bg-destructive/10 border border-destructive/30 text-sm"
                   >
-                    <AlertCircle size={16} className="text-destructive flex-shrink-0 mt-0.5" />
+                    <AlertCircle size={16} className="text-destructive shrink-0 mt-0.5" />
                     <span className="text-destructive">{entry.content}</span>
                   </div>
                 );
@@ -144,7 +144,7 @@ export function ChatPanel() {
                   className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}
                 >
                   <div
-                    className={`max-w-[80%] rounded px-3 py-2 text-sm whitespace-pre-wrap ${
+                    className={`max-w-[80%] px-3 py-2 text-sm whitespace-pre-wrap ${
                       isUser
                         ? 'bg-accent/15 text-text-primary'
                         : 'bg-bg-base border border-border text-text-primary'
@@ -159,7 +159,7 @@ export function ChatPanel() {
             {/* 2.5: Loading indicator in message area */}
             {loading && (
               <div className="flex justify-start">
-                <div className="bg-bg-base border border-border rounded px-3 py-2 flex items-center gap-2 text-sm text-text-secondary">
+                <div className="bg-bg-base border border-border px-3 py-2 flex items-center gap-2 text-sm text-text-secondary">
                   <Loader2 size={14} className="animate-spin" />
                   Thinking...
                 </div>
@@ -180,12 +180,12 @@ export function ChatPanel() {
           onKeyDown={handleKeyDown}
           placeholder="Ask about your prompts..."
           rows={1}
-          className="flex-1 bg-bg-base border border-border rounded-sm px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent transition-colors resize-none"
+          className="flex-1 bg-bg-base border border-border px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent transition-colors resize-none inset-surface"
         />
         <button
           onClick={handleSend}
           disabled={isInputEmpty || loading}
-          className="flex items-center justify-center w-9 h-9 rounded-sm bg-accent hover:bg-accent-hover text-bg-base transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          className="flex items-center justify-center w-9 h-9 bg-accent hover:bg-accent-hover text-text-on-accent transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
         >
           {loading ? (
             <Loader2 size={16} className="animate-spin" />

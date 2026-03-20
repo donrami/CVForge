@@ -57,10 +57,30 @@ export async function generateApplicationsPDF(
 
       // Draw rows
       doc.font('Helvetica').fontSize(8);
+      const cellPadding = 4;
 
       for (const app of applications) {
+        const d = app.createdAt instanceof Date ? app.createdAt : new Date(app.createdAt);
+        const createdDate = `${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}.${d.getFullYear()}`;
+
+        const values: Record<string, string> = {
+          companyName: app.companyName,
+          jobTitle: app.jobTitle,
+          status: app.status,
+          targetLanguage: app.targetLanguage,
+          createdAt: createdDate,
+        };
+
+        // Measure the height each cell needs
+        doc.font('Helvetica').fontSize(8);
+        let maxCellHeight = rowHeight;
+        for (const col of columns) {
+          const textHeight = doc.heightOfString(values[col.key] ?? '', { width: col.width - cellPadding });
+          maxCellHeight = Math.max(maxCellHeight, textHeight + cellPadding * 2);
+        }
+
         // Check if we need a new page
-        if (y + rowHeight > doc.page.height - 50) {
+        if (y + maxCellHeight > doc.page.height - 50) {
           doc.addPage();
           y = 50;
 
@@ -78,24 +98,12 @@ export async function generateApplicationsPDF(
         }
 
         x = tableLeft;
-        const createdDate = app.createdAt instanceof Date
-          ? app.createdAt.toISOString().split('T')[0]
-          : new Date(app.createdAt).toISOString().split('T')[0];
-
-        const values: Record<string, string> = {
-          companyName: app.companyName,
-          jobTitle: app.jobTitle,
-          status: app.status,
-          targetLanguage: app.targetLanguage,
-          createdAt: createdDate,
-        };
-
         for (const col of columns) {
-          doc.text(values[col.key] ?? '', x, y, { width: col.width, ellipsis: true });
+          doc.text(values[col.key] ?? '', x, y, { width: col.width - cellPadding });
           x += col.width;
         }
 
-        y += rowHeight;
+        y += maxCellHeight;
       }
 
       doc.end();

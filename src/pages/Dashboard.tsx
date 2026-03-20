@@ -52,7 +52,6 @@ export function Dashboard() {
       });
   }, [currentPage, pageSize]);
 
-  // Clear the highlighted parameter after first render
   useEffect(() => {
     if (highlightedId) {
       const timer = setTimeout(() => {
@@ -192,7 +191,6 @@ export function Dashboard() {
       const data = await response.json();
       toast(`Restored: ${data.created} created, ${data.updated} updated`, 'success');
       setCurrentPage(1);
-      // Re-fetch applications at page 1
       const listRes = await fetch(`/api/applications?skip=0&take=${pageSize}`);
       if (listRes.ok) {
         const listData = await listRes.json();
@@ -214,87 +212,75 @@ export function Dashboard() {
     setRestoreAppCount(0);
   };
 
+  const toolbarBtnClass = "flex items-center gap-2 px-3 py-1.5 border border-border text-text-secondary font-mono text-xs uppercase tracking-wider hover:text-text-primary hover:border-text-muted transition-colors disabled:opacity-40 disabled:cursor-not-allowed";
+
   return (
-    <div className="space-y-8">
-      <div className="flex justify-between items-end border-b border-border pb-6">
+    <div className="space-y-6">
+      <div className="flex justify-between items-end pb-6 border-b border-border">
         <div>
-          <h1 className="text-4xl font-serif text-text-primary tracking-tight mb-2">Applications</h1>
-          <p className="text-text-secondary">Track and manage your generated CVs.</p>
+          <h1 className="text-[2.5rem] font-serif text-text-primary tracking-tight leading-tight">Applications</h1>
+          <p className="text-text-secondary mt-1">Track and manage your generated CVs</p>
         </div>
         <Link 
           to="/new" 
-          className="flex items-center gap-2 bg-accent hover:bg-accent-hover text-bg-base font-medium px-4 py-2 rounded transition-colors"
+          className="flex items-center gap-2 bg-accent hover:bg-accent-hover text-text-on-accent font-medium px-4 py-2 transition-colors"
         >
           <Plus size={18} />
           New Application
         </Link>
       </div>
 
-      <div className="flex gap-4 items-center">
+      <div className="flex gap-3 items-center">
         <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary" size={18} />
+          <Search className="absolute left-0 top-1/2 -translate-y-1/2 text-text-muted" size={16} />
           <input 
             type="text" 
             placeholder="Search company or title..." 
             value={search}
             onChange={e => handleSearchChange(e.target.value)}
-            className="w-full bg-bg-surface border border-border rounded pl-10 pr-4 py-2 text-text-primary focus:outline-none focus:border-accent transition-colors"
+            className="w-full bg-transparent border-b border-border pl-6 pr-4 py-2 text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent transition-colors"
           />
         </div>
-        <button className="flex items-center gap-2 px-4 py-2 border border-border rounded text-text-secondary hover:bg-bg-elevated transition-colors">
-          <Filter size={18} />
+        <button className={toolbarBtnClass}>
+          <Filter size={14} />
           Filter
         </button>
-        <button
-          disabled={backupLoading}
-          onClick={handleBackup}
-          className="flex items-center gap-2 px-4 py-2 border border-border rounded text-text-secondary hover:bg-bg-elevated transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          {backupLoading ? <Loader2 size={18} className="animate-spin" /> : <Download size={18} />}
+        <button disabled={backupLoading} onClick={handleBackup} className={toolbarBtnClass}>
+          {backupLoading ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
           Backup
         </button>
-        <button
-          disabled={exportLoading}
-          onClick={handleExportPDF}
-          className="flex items-center gap-2 px-4 py-2 border border-border rounded text-text-secondary hover:bg-bg-elevated transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          {exportLoading ? <Loader2 size={18} className="animate-spin" /> : <FileText size={18} />}
+        <button disabled={exportLoading} onClick={handleExportPDF} className={toolbarBtnClass}>
+          {exportLoading ? <Loader2 size={14} className="animate-spin" /> : <FileText size={14} />}
           Export PDF
         </button>
-        <button
-          disabled={restoreLoading}
-          onClick={handleRestoreClick}
-          className="flex items-center gap-2 px-4 py-2 border border-border rounded text-text-secondary hover:bg-bg-elevated transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          {restoreLoading ? <Loader2 size={18} className="animate-spin" /> : <RefreshCw size={18} />}
+        <button disabled={restoreLoading} onClick={handleRestoreClick} className={toolbarBtnClass}>
+          {restoreLoading ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
           Restore
         </button>
       </div>
 
-      <div className="bg-bg-surface border border-border rounded overflow-hidden">
+      <div className="border border-border overflow-hidden bg-bg-surface surface-card">
         <table className="w-full text-left border-collapse">
           <thead>
-            <tr className="border-b border-border bg-bg-elevated text-text-secondary text-xs uppercase tracking-wider">
-              <th className="p-4 font-medium">Company</th>
-              <th className="p-4 font-medium">Role</th>
-              <th className="p-4 font-medium">Status</th>
-              <th className="p-4 font-medium">Language</th>
-              <th className="p-4 font-medium">Date</th>
-              <th className="p-4 font-medium text-right">Actions</th>
+            <tr className="thead-gradient text-thead-text border-b border-border">
+              <th className="p-4 font-mono text-[11px] font-normal uppercase tracking-wider">Company</th>
+              <th className="p-4 font-mono text-[11px] font-normal uppercase tracking-wider">Role</th>
+              <th className="p-4 font-mono text-[11px] font-normal uppercase tracking-wider">Status</th>
+              <th className="p-4 font-mono text-[11px] font-normal uppercase tracking-wider">Lang</th>
+              <th className="p-4 font-mono text-[11px] font-normal uppercase tracking-wider">Date</th>
+              <th className="p-4 font-mono text-[11px] font-normal uppercase tracking-wider text-right">Actions</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-border">
+          <tbody>
             {loading ? (
-              <tr><td colSpan={6} className="p-8 text-center text-text-secondary">Loading...</td></tr>
+              <tr><td colSpan={6} className="p-8 text-center text-text-muted font-mono text-sm">Loading...</td></tr>
             ) : filteredApps.length === 0 ? (
               <tr><td colSpan={6}><EmptyState message="No applications found." /></td></tr>
             ) : filteredApps.map(app => (
               <tr 
                 key={app.id} 
-                className={`hover:bg-bg-elevated transition-colors group ${
-                  highlightedId === app.id 
-                    ? 'flash-highlight' 
-                    : ''
+                className={`border-b border-border hover:bg-bg-elevated transition-colors group ${
+                  highlightedId === app.id ? 'flash-highlight' : ''
                 }`}
               >
                 <td className="p-4 font-medium text-text-primary">
@@ -302,22 +288,22 @@ export function Dashboard() {
                     {app.companyName}
                   </Link>
                 </td>
-                <td className="p-4 text-text-secondary">{app.jobTitle}</td>
+                <td className="p-4 text-text-primary">{app.jobTitle}</td>
                 <td className="p-4">
                   <StatusBadge status={app.status} />
                 </td>
                 <td className="p-4 text-text-secondary font-mono text-sm">{app.targetLanguage}</td>
-                <td className="p-4 text-text-secondary font-mono text-sm">
-                  {format(new Date(app.createdAt), 'MMM dd, yyyy')}
+                <td className="p-4 text-text-secondary font-mono text-sm whitespace-nowrap">
+                  {format(new Date(app.createdAt), 'dd.MM.yyyy')}
                 </td>
-                <td className="p-4 text-right space-x-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <a href={`/api/applications/${app.id}/download/tex`} className="inline-flex p-2 text-text-secondary hover:text-accent transition-colors" title="Download TEX">
+                <td className="p-4 text-right whitespace-nowrap space-x-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <a href={`/api/applications/${app.id}/download/tex`} className="inline-flex p-2 text-text-muted hover:text-accent transition-colors" title="Download TEX">
                     <FileText size={16} />
                   </a>
-                  <a href={`/api/applications/${app.id}/download/pdf`} className="inline-flex p-2 text-text-secondary hover:text-accent transition-colors" title="Download PDF">
+                  <a href={`/api/applications/${app.id}/download/pdf`} className="inline-flex p-2 text-text-muted hover:text-accent transition-colors" title="Download PDF">
                     <Download size={16} />
                   </a>
-                  <button onClick={() => handleDelete(app.id)} className="inline-flex p-2 text-text-secondary hover:text-destructive transition-colors" title="Delete">
+                  <button onClick={() => handleDelete(app.id)} className="inline-flex p-2 text-text-muted hover:text-destructive transition-colors" title="Delete">
                     <Trash2 size={16} />
                   </button>
                 </td>
@@ -346,20 +332,17 @@ export function Dashboard() {
 }
 
 function StatusBadge({ status }: { status: string }) {
-  const dotColors: Record<string, string> = {
-    GENERATED: 'bg-status-generated',
-    APPLIED: 'bg-status-applied',
-    INTERVIEW: 'bg-status-interview',
-    OFFER: 'bg-status-offer',
-    REJECTED: 'bg-status-rejected',
-    WITHDRAWN: 'bg-status-withdrawn',
+  const styles: Record<string, string> = {
+    GENERATED: 'bg-status-generated/10 text-status-generated',
+    APPLIED: 'bg-status-applied/10 text-status-applied',
+    INTERVIEW: 'bg-status-interview/10 text-status-interview',
+    OFFER: 'bg-status-offer/10 text-status-offer',
+    REJECTED: 'bg-status-rejected/10 text-status-rejected',
+    WITHDRAWN: 'bg-status-withdrawn/10 text-status-withdrawn',
   };
 
-  const dotColor = dotColors[status] || dotColors.GENERATED;
-
   return (
-    <span className="inline-flex items-center gap-2 text-xs font-medium text-text-secondary">
-      <span className={`w-2 h-2 rounded-sm ${dotColor}`} />
+    <span className={`inline-flex items-center px-2 py-0.5 rounded-sm font-mono text-[10px] uppercase tracking-wider ${styles[status] || styles.GENERATED}`}>
       {status}
     </span>
   );

@@ -5,11 +5,12 @@ import { NewApplication } from './pages/NewApplication';
 import { ApplicationDetail } from './pages/ApplicationDetail';
 import { Settings } from './pages/Settings';
 import { DialogProvider } from './context/DialogContext';
+import { ThemeProvider } from './context/ThemeContext';
 import { BackgroundTexture } from './components/BackgroundTexture';
 
 export default function App() {
   return (
-    <>
+    <ThemeProvider>
       <BackgroundTexture />
       <DialogProvider>
         <Routes>
@@ -21,6 +22,6 @@ export default function App() {
           </Route>
         </Routes>
       </DialogProvider>
-    </>
+    </ThemeProvider>
   );
 }

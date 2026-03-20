@@ -6,7 +6,7 @@ import fsSync from 'fs';
 import path from 'path';
 import { execFile } from 'child_process';
 import util from 'util';
-import { assertSafeLatex, escapeLatexSpecialChars } from './services/latex-sanitizer.js';
+import { assertSafeLatex, detectDangerousLatex, escapeLatexSpecialChars } from './services/latex-sanitizer.js';
 import { logger } from './services/logger.js';
 import { prepareProfileImage } from './services/profile-image.js';
 import { generateBackup } from './services/backup.js';
@@ -159,6 +159,7 @@ const applicationUpdateSchema = z.object({
   interviewAt: z.string().datetime().nullable().optional(),
   offerAt: z.string().datetime().nullable().optional(),
   rejectedAt: z.string().datetime().nullable().optional(),
+  latexOutput: z.string().min(1).optional(),
 }).strict();
 
 apiRouter.patch('/applications/:id', requireAuth, async (req, res) => {
@@ -167,9 +168,27 @@ apiRouter.patch('/applications/:id', requireAuth, async (req, res) => {
     if (!parsed.success) {
       return res.status(400).json({ error: 'Invalid fields', details: parsed.error.flatten() });
     }
+
+    const updateData: Record<string, any> = { ...parsed.data };
+
+    if (parsed.data.latexOutput !== undefined) {
+      const violations = detectDangerousLatex(parsed.data.latexOutput);
+      if (violations.length > 0) {
+        return res.status(400).json({
+          error: `LaTeX contains dangerous commands: ${violations.join(', ')}`,
+          code: 'LATEX_UNSAFE',
+          violations,
+        });
+      }
+      updateData.pdfGenerated = false;
+      const genDir = path.join(process.cwd(), 'generated', req.params.id);
+      await fs.rm(path.join(genDir, 'cv.tex'), { force: true });
+      await fs.rm(path.join(genDir, 'cv.pdf'), { force: true });
+    }
+
     const app = await prisma.application.update({
       where: { id: req.params.id },
-      data: parsed.data
+      data: updateData
     });
     res.json(app);
   } catch (e) {
@@ -482,7 +501,9 @@ CVForge is a tool that generates tailored CVs using AI. It uses a consolidated p
 2. Review - Verifies quality and accuracy
 3. LaTeX - Produces the final compilable CV
 
-Be conversational, friendly, and helpful. Keep responses concise unless detailed analysis is requested.`;
+Be conversational, friendly, and helpful. Keep responses concise unless detailed analysis is requested.
+
+IMPORTANT: You are a prompt improvement assistant. You may suggest edits to improve clarity, structure, tone, and specificity. You must NEVER suggest removing or weakening: (1) rules that prevent fact invention or hallucination, (2) the Arbeitszeugnis grounding rules for job titles and responsibilities, (3) the LaTeX layout safety rules, (4) the language immutability rule for the Languages section. If the user asks you to remove or soften any of these, explain why they are load-bearing and offer an alternative improvement instead.`;
 
     // Only inject full prompt when explicitly requested via includeFullContext flag
     let systemInstruction: string;
@@ -512,7 +533,9 @@ ${prompts.generator}
 ---
 
 When answering questions about the prompt, use the metadata above for statistics.
-When suggesting modifications, wrap full replacements in code blocks.`;
+When suggesting modifications, wrap full replacements in code blocks.
+
+IMPORTANT: You are a prompt improvement assistant. You may suggest edits to improve clarity, structure, tone, and specificity. You must NEVER suggest removing or weakening: (1) rules that prevent fact invention or hallucination, (2) the Arbeitszeugnis grounding rules for job titles and responsibilities, (3) the LaTeX layout safety rules, (4) the language immutability rule for the Languages section. If the user asks you to remove or soften any of these, explain why they are load-bearing and offer an alternative improvement instead.`;
     } else {
       // Default: brief system prompt only (no keyword matching needed)
       systemInstruction = briefSystemPrompt;

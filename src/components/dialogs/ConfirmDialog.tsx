@@ -65,17 +65,17 @@ export function ConfirmDialog({
     <div
       ref={dialogRef}
       onClick={handleBackdropClick}
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-overlay backdrop-blur-sm animate-in fade-in duration-200"
       role="dialog"
       aria-modal="true"
       aria-labelledby="confirm-dialog-title"
       aria-describedby="confirm-dialog-description"
     >
-      <div className="bg-bg-surface border border-border rounded-sm shadow-2xl max-w-md w-full animate-in zoom-in-95 duration-200">
+      <div className="bg-bg-surface border border-border shadow-2xl max-w-md w-full animate-in zoom-in-95 duration-200">
         <div className="p-6">
           <div className="flex items-start gap-4">
             {isDestructive && (
-              <div className="flex-shrink-0 w-10 h-10 rounded-full bg-destructive/10 flex items-center justify-center">
+              <div className="shrink-0 w-10 h-10 rounded-full bg-destructive/10 flex items-center justify-center">
                 <AlertTriangle className="w-5 h-5 text-destructive" />
               </div>
             )}
@@ -106,10 +106,10 @@ export function ConfirmDialog({
           <button
             ref={confirmButtonRef}
             onClick={onConfirm}
-            className={`px-4 py-2 text-sm font-medium rounded-sm transition-colors ${
+            className={`px-4 py-2 text-sm font-medium transition-colors ${
               isDestructive
                 ? 'bg-transparent border border-destructive text-destructive hover:bg-destructive/10'
-                : 'bg-accent hover:bg-accent-hover text-bg-base'
+                : 'bg-accent hover:bg-accent-hover text-text-on-accent'
             }`}
           >
             {confirmText}
