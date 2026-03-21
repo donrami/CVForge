@@ -16,6 +16,7 @@ CVForge is a personal, self-hosted AI-powered CV generator and job application t
 - **Customizable Prompt** — Edit the consolidated generator prompt directly from the Settings UI. Reset to defaults anytime
 - **LaTeX Sanitizer** — AI-generated LaTeX is stripped of dangerous commands (`\input`, `\write18`, etc.) and special characters are escaped before compilation
 - **Structured Logging** — Pino-based JSON logging throughout the server
+- **Chat Assistant** — Interactive AI chat interface for prompt refinement and CV advice
 
 ## Tech Stack
 
@@ -70,6 +71,9 @@ npm run dev
 │       ├── pdf-extractor.ts          # PDF text + image extraction (native + OCR fallback)
 │       ├── profile-image.ts          # Profile photo handling for LaTeX
 │       ├── prompts.ts                # File-based prompt management (single generator prompt)
+│       ├── cv-schema.ts              # CV JSON schema for structured LLM output
+│       ├── cv-template.ts            # Legacy Handlebars template engine
+│       ├── template-deriver.ts       # Auto-derives Handlebars templates from LaTeX
 │       └── logger.ts                 # Pino logger
 ├── src/                   # React frontend
 │   ├── pages/             # Dashboard, NewApplication, ApplicationDetail, Settings

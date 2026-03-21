@@ -12,6 +12,7 @@ import { prepareProfileImage } from './services/profile-image.js';
 import { generateBackup } from './services/backup.js';
 import { validateBackupFile, restoreFromBackup } from './services/restore.js';
 import { generateApplicationsPDF } from './services/pdf-export.js';
+import { getJob, getActiveJobsSummary } from './services/job.js';
 
 const execFileAsync = util.promisify(execFile);
 
@@ -35,6 +36,39 @@ export const apiRouter = Router();
 
 // No-op auth middleware (app runs locally for a single user)
 export const requireAuth = (_req: any, _res: any, next: any) => next();
+
+// Job Routes - for background generation polling
+apiRouter.get('/jobs', requireAuth, async (req, res) => {
+  try {
+    const jobs = await getActiveJobsSummary();
+    res.json({ jobs });
+  } catch (e) {
+    errorResponse(res, 500, e, 'DATABASE_ERROR');
+  }
+});
+
+apiRouter.get('/jobs/:id', requireAuth, async (req, res) => {
+  try {
+    const job = await getJob(req.params.id);
+    if (!job) {
+      return res.status(404).json({ error: 'Job not found', code: 'NOT_FOUND' });
+    }
+    res.json({
+      id: job.id,
+      status: job.status,
+      phase: job.phase,
+      aiChars: job.aiChars,
+      applicationId: job.applicationId,
+      error: job.error,
+      companyName: job.companyName,
+      jobTitle: job.jobTitle,
+      createdAt: job.createdAt,
+      updatedAt: job.updatedAt,
+    });
+  } catch (e) {
+    errorResponse(res, 500, e, 'DATABASE_ERROR');
+  }
+});
 
 // Applications Routes
 apiRouter.get('/applications', requireAuth, async (req, res) => {

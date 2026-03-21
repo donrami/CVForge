@@ -51,6 +51,7 @@ enum Language {
 }
 
 enum AppStatus {
+  GENERATING
   GENERATED
   APPLIED
   INTERVIEW
@@ -83,4 +84,36 @@ model Certificate {
 
   // Confidence score from AI extraction (0-1)
   confidence       Float    @default(0)
+}
+
+model GenerationJob {
+  id                String    @id @default(cuid())
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  // Job state
+  status            JobStatus @default(PENDING)
+  error             String?   @db.Text
+
+  // Input params (mirrors Application for job creation)
+  companyName       String
+  jobTitle          String
+  jobDescription    String    @db.Text
+  targetLanguage    Language  @default(EN)
+  additionalContext String?   @db.Text
+  parentId          String?
+
+  // Result - set when job completes
+  applicationId     String?
+
+  // Progress tracking (for polling)
+  phase             String?   // "preparing" | "ai-working" | "finalizing"
+  aiChars           Int       @default(0)
+}
+
+enum JobStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
 }

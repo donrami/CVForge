@@ -7,6 +7,7 @@ import { escapeLatexSpecialChars, deduplicatePreamble, stripDangerousLatex } fro
 import { logger } from './services/logger.js';
 import { prepareProfileImage } from './services/profile-image.js';
 import { loadAllPrompts } from './services/prompts.js';
+import { createJob, startJob, updateJobProgress, completeJob, failJob, JobProgress } from './services/job.js';
 
 export const generateRouter = Router();
 
@@ -38,28 +39,28 @@ export function extractLatex(responseText: string): string {
   return latex;
 }
 
-const handleGenerate = async (req: any, res: any) => {
-  const { jobDescription, companyName, jobTitle, targetLanguage, additionalContext, parentId } = req.body;
-  
+/**
+ * The actual CV generation logic - separated from HTTP handling.
+ * This can be called synchronously or via setImmediate for background processing.
+ */
+export async function processGeneration(jobId: string) {
+  // Load job from database
+  const job = await prisma.generationJob.findUnique({ where: { id: jobId } });
+  if (!job) {
+    logger.error({ jobId }, 'Job not found');
+    return;
+  }
+
+  const { companyName, jobTitle, jobDescription, targetLanguage, additionalContext, parentId } = job;
+
   // Convert targetLanguage to uppercase for Prisma enum (EN, DE)
-  const normalizedLanguage = (targetLanguage || 'en').toUpperCase();
+  const normalizedLanguage = (targetLanguage || 'EN').toUpperCase();
   // Use lowercase for LLM prompt (prompt expects "en" or "de")
   const promptLanguage = normalizedLanguage.toLowerCase();
-  
-  // DEBUG: Log the target language being used
-  logger.info({ targetLanguage, normalizedLanguage, promptLanguage }, 'Generation requested with target language');
-  
-  res.setHeader('Content-Type', 'text/event-stream');
-  res.setHeader('Cache-Control', 'no-cache');
-  res.setHeader('Connection', 'keep-alive');
-  res.flushHeaders();
-
-  const sendEvent = (type: string, data: any) => {
-    res.write(`data: ${JSON.stringify({ type, ...data })}\n\n`);
-  };
 
   try {
-    sendEvent('step', { message: 'Assembling context...' });
+    await startJob(jobId);
+    await updateJobProgress(jobId, { phase: 'preparing', aiChars: 0 });
 
     // Load the generator prompt — must exist on disk, no hardcoded fallback
     const prompts = await loadAllPrompts();
@@ -69,7 +70,7 @@ const handleGenerate = async (req: any, res: any) => {
     }
 
     const contextDir = path.join(process.cwd(), 'context');
-    
+
     const readContextFile = async (name: string) => {
       try { return await fs.readFile(path.join(contextDir, name), 'utf-8'); } catch { return ''; }
     };
@@ -80,7 +81,7 @@ const handleGenerate = async (req: any, res: any) => {
       logger.debug('instructions.md not found or empty — skipping optional context');
     }
 
-     const generationContext = `
+    const generationContext = `
 MASTER CV (SOURCE OF TRUTH):
 ${masterCv}
 
@@ -98,11 +99,11 @@ ADDITIONAL CONTEXT: ${additionalContext || 'None'}
 IMPORTANT: Always use TARGET LANGUAGE = "${promptLanguage}" for the output format and language selection. Do not detect language from the master CV.
 `;
 
-    sendEvent('step', { message: 'Analyzing job requirements and crafting your CV...' });
+    await updateJobProgress(jobId, { phase: 'ai-working', aiChars: 0 });
 
     const modelId = 'gemini-3.1-pro-preview';
-    
-    // Use streaming to provide live progress during the long AI generation step
+
+    // Use streaming to track progress
     const stream = await ai.models.generateContentStream({
       model: modelId,
       contents: `${generatorPrompt}\n\nCONTEXT:\n${generationContext}`,
@@ -110,23 +111,20 @@ IMPORTANT: Always use TARGET LANGUAGE = "${promptLanguage}" for the output forma
     });
 
     let responseText = '';
-    let lastProgressAt = 0;
+    let lastProgressUpdate = 0;
 
     for await (const chunk of stream) {
       const text = chunk.text || '';
       responseText += text;
 
-      if (responseText.length - lastProgressAt >= 300) {
-        lastProgressAt = responseText.length;
-        sendEvent('ai-progress', {
-          chars: responseText.length,
-        });
+      // Update progress every 300 chars or on completion
+      if (responseText.length - lastProgressUpdate >= 300 || !chunk.text) {
+        lastProgressUpdate = responseText.length;
+        await updateJobProgress(jobId, { phase: 'ai-working', aiChars: responseText.length });
       }
     }
 
-    sendEvent('ai-progress', { chars: responseText.length, done: true });
-    
-    sendEvent('step', { message: 'Compiling and saving...' });
+    await updateJobProgress(jobId, { phase: 'finalizing', aiChars: responseText.length });
 
     // Extract LaTeX from response
     let latexOutput = extractLatex(responseText);
@@ -140,11 +138,12 @@ IMPORTANT: Always use TARGET LANGUAGE = "${promptLanguage}" for the output forma
     latexOutput = deduplicatePreamble(latexOutput);
     latexOutput = escapeLatexSpecialChars(latexOutput);
 
-    // Profile image handling (unchanged)
+    // Profile image handling
     const genDir = path.join(process.cwd(), 'generated', Date.now().toString());
     await fs.mkdir(genDir, { recursive: true });
     latexOutput = await prepareProfileImage(latexOutput, genDir);
 
+    // Create application record
     const app = await prisma.application.create({
       data: {
         companyName,
@@ -159,39 +158,117 @@ IMPORTANT: Always use TARGET LANGUAGE = "${promptLanguage}" for the output forma
           model: modelId,
           timestamp: new Date().toISOString(),
           targetLanguage: targetLanguage,
+          jobId, // Track which job created this application
         }),
-        parentId
-      }
+        parentId,
+      },
     });
 
     // Write LaTeX to file
     await fs.writeFile(path.join(genDir, 'cv.tex'), latexOutput);
 
-    sendEvent('complete', { applicationId: app.id });
-    res.end();
+    // Mark job as complete
+    await completeJob(jobId, app.id);
+    logger.info({ jobId, applicationId: app.id }, 'Generation job completed successfully');
 
   } catch (e: any) {
-    logger.error({ err: e }, 'Generation pipeline failed');
-    sendEvent('error', { message: e.message });
-    res.end();
+    logger.error({ err: e, jobId }, 'Generation pipeline failed');
+    await failJob(jobId, e.message);
   }
-};
+}
 
-generateRouter.post('/generate', requireAuth, handleGenerate);
+/**
+ * POST /api/generate
+ * 
+ * Fire-and-forget endpoint. Creates a job and returns immediately.
+ * The actual generation happens asynchronously in the background.
+ */
+generateRouter.post('/generate', requireAuth, async (req, res) => {
+  const { jobDescription, companyName, jobTitle, targetLanguage, additionalContext, parentId } = req.body;
 
+  // Validate required fields
+  if (!jobDescription || !companyName || !jobTitle) {
+    return res.status(400).json({ error: 'Missing required fields: jobDescription, companyName, jobTitle' });
+  }
+
+  // Convert targetLanguage to uppercase for Prisma enum (EN, DE)
+  const normalizedLanguage = (targetLanguage || 'EN').toUpperCase();
+
+  try {
+    // Create job in database
+    const job = await createJob({
+      companyName,
+      jobTitle,
+      jobDescription,
+      targetLanguage: normalizedLanguage,
+      additionalContext,
+      parentId,
+    });
+
+    logger.info({ jobId: job.id, companyName, jobTitle }, 'Generation job created');
+
+    // Return immediately with job ID (202 Accepted)
+    res.status(202).json({
+      jobId: job.id,
+      status: job.status,
+      message: 'Generation started in background',
+    });
+
+    // Process generation asynchronously (fire-and-forget)
+    setImmediate(() => {
+      processGeneration(job.id).catch((e) => {
+        logger.error({ err: e, jobId: job.id }, 'Async generation failed');
+      });
+    });
+
+  } catch (e: any) {
+    logger.error({ err: e }, 'Failed to create generation job');
+    res.status(500).json({ error: 'Failed to start generation' });
+  }
+});
+
+/**
+ * POST /api/applications/:id/regenerate
+ * 
+ * Regeneration endpoint - creates a new generation job from a parent application.
+ * Uses the same fire-and-forget pattern.
+ */
 generateRouter.post('/applications/:id/regenerate', requireAuth, async (req, res) => {
   const { additionalContext, targetLanguage } = req.body;
   const parentApp = await prisma.application.findUnique({ where: { id: req.params.id } });
   if (!parentApp) return res.status(404).json({ error: 'Parent application not found' });
-  
-  req.body = {
-    jobDescription: parentApp.jobDescription,
-    companyName: parentApp.companyName,
-    jobTitle: parentApp.jobTitle,
-    targetLanguage: targetLanguage || parentApp.targetLanguage,
-    additionalContext: additionalContext || parentApp.additionalContext,
-    parentId: parentApp.id
-  };
-  
-  return handleGenerate(req, res);
+
+  const normalizedLanguage = (targetLanguage || parentApp.targetLanguage || 'EN').toUpperCase();
+
+  try {
+    // Create job in database
+    const job = await createJob({
+      companyName: parentApp.companyName,
+      jobTitle: parentApp.jobTitle,
+      jobDescription: parentApp.jobDescription,
+      targetLanguage: normalizedLanguage,
+      additionalContext: additionalContext || parentApp.additionalContext,
+      parentId: parentApp.id,
+    });
+
+    logger.info({ jobId: job.id, parentId: parentApp.id }, 'Regeneration job created');
+
+    // Return immediately with job ID (202 Accepted)
+    res.status(202).json({
+      jobId: job.id,
+      status: job.status,
+      message: 'Regeneration started in background',
+    });
+
+    // Process generation asynchronously
+    setImmediate(() => {
+      processGeneration(job.id).catch((e) => {
+        logger.error({ err: e, jobId: job.id }, 'Async regeneration failed');
+      });
+    });
+
+  } catch (e: any) {
+    logger.error({ err: e }, 'Failed to create regeneration job');
+    res.status(500).json({ error: 'Failed to start regeneration' });
+  }
 });

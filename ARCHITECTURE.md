@@ -21,8 +21,8 @@ CVForge is a self-hosted, single-user AI-powered CV generator and job applicatio
 ```
 server.ts                         # Express entry point. Initializes Prisma, Gemini client, Vite dev middleware, static serving, health check. Exports `prisma` and `ai` singletons.
 server/
-  routes.ts                       # Main API router. CRUD for applications (list, get, patch, soft-delete). Download endpoints for .tex and .pdf (compiles on demand). Backup/restore endpoints (JSON export/import with merge). PDF export endpoint. Settings endpoints for master CV, certificates.md, profile image (multer upload), and prompt management. Chat assistant endpoint (/prompts/chat).
-  generate.ts                     # CV generation pipeline. LLM produces LaTeX directly. Streams character-count progress via SSE. Extracts LaTeX from response (handles markdown fences), sanitizes, handles profile image injection, saves to DB and filesystem. Also handles /regenerate (creates child application from parent).
+  routes.ts                       # Main API router. CRUD for applications (list, get, patch, soft-delete). Download endpoints for .tex and .pdf (compiles on demand). Backup/restore endpoints (JSON export/import with merge). PDF export endpoint. Settings endpoints for master CV, certificates.md, profile image (multer upload), and prompt management. Chat assistant endpoint (/prompts/chat). Job status endpoints for background generation polling.
+  generate.ts                     # CV generation pipeline. LLM produces LaTeX directly. Fire-and-forget pattern: POST returns immediately with jobId, processing happens async via setImmediate(). Job status tracked in GenerationJob model. Extracts LaTeX from response (handles markdown fences), sanitizes, handles profile image injection, saves to DB and filesystem. Also handles /regenerate (creates child application from parent).
   certificates.ts                 # Certificate CRUD + PDF extraction via Gemini Vision + sync-to-context (writes certificates.md). Supports both skill certificates and work certificates (Arbeitszeugnisse).
   middleware/upload.ts            # Multer config for certificate PDF uploads (temp directory, file size limits).
   services/
@@ -32,18 +32,24 @@ server/
     pdf-extractor.ts              # Gemini Vision-based PDF text extraction. Sends PDF directly to Gemini's multimodal API which handles both native text and scanned/image-based PDFs. Returns structured extraction results with language detection.
     profile-image.ts              # Finds user's uploaded profile image, copies it to generation directory, patches \includegraphics references in LaTeX. Falls back to 1x1 transparent PNG placeholder if no image uploaded.
     prompts.ts                    # File-based prompt management. Reads/writes generator.md from context/prompts/. No hardcoded fallback — the file must exist. Exposes loadAllPrompts(), saveAllPrompts(), getDefaults().
+    cv-schema.ts                 # CV JSON schema definition for structured LLM output (alternative to direct LaTeX).
+    template-deriver.ts          # Parses plain LaTeX master CV and auto-derives Handlebars templates by replacing content with placeholders.
     backup.ts                     # BackupService. Exports all non-deleted applications as a JSON file with version metadata. Returns BackupData with version, exportedAt, and applications array.
     restore.ts                    # RestoreService. Validates uploaded JSON backup files (structure, required fields, enum values, ISO dates). Restores via Prisma $transaction with upsert (merge by id). Returns created/updated counts.
     pdf-export.ts                 # PDFExportService. Generates a PDF table of applications using pdfkit. Columns: Company, Role, Status, Language, Date. Returns a Buffer.
+    job.ts                        # Job management service. CRUD operations for GenerationJob model: createJob, startJob, updateJobProgress, completeJob, failJob, getJob, getActiveJobs.
     logger.ts                     # Pino logger instance.
 
 src/                              # React SPA frontend
   pages/
     Dashboard.tsx                 # Lists applications with pagination (10 per page). Toolbar with Backup (JSON), Export PDF, and Restore buttons. Search filter resets to page 1. Restore flow: file picker → confirmation dialog → upload → refresh.
-    NewApplication.tsx            # Form: company name, job title, job description, target language (EN/DE), additional context. Streams generation progress via SSE.
+    NewApplication.tsx            # Form: company name, job title, job description, target language (EN/DE), additional context. Uses job-based generation with polling for progress. User can navigate away while generation continues in background.
     ApplicationDetail.tsx         # View application details, download PDF/TEX, update status/notes/dates, regenerate with additional context.
-    Settings.tsx                  # Tabs: Master CV editor, Certificate management (upload/extract/edit/sync), Profile image upload, Prompt editor (generator with reset-to-defaults).
-    Login.tsx                     # (Removed — no auth needed for self-hosted use)
+    Settings.tsx                 # Tabs: Master CV editor, Certificate management (upload/extract/edit/sync), Profile image upload, Prompt editor (generator with reset-to-defaults).
+    Login.tsx                    # (Removed — no auth needed for self-hosted use)
+  hooks/
+    useJobStatus.ts              # Hook for polling job status until completion or error. Manages polling lifecycle, callbacks for progress/complete/error.
+    useActiveJobChecker.ts       # Hook for monitoring completed jobs when user returns to the app. Stores known job IDs in sessionStorage for cross-page-load continuity.
   components/                     # UI components, dialogs, layout wrapper. Includes PaginationControls (Previous/Next with page info) and RestoreConfirmationDialog (merge confirmation with application count).
   context/                        # React context providers for dialog state.
 
@@ -63,17 +69,27 @@ uploads/
 
 ## Database Schema
 
-Two models in PostgreSQL via Prisma:
+Three models in PostgreSQL via Prisma:
 
 **Application**
 - `id` (CUID), `createdAt`, `updatedAt`, `deletedAt` (soft delete)
 - `companyName`, `jobTitle`, `jobDescription` (text), `targetLanguage` (EN | DE)
 - `iterationCount`, `additionalContext` (text, optional)
 - `latexOutput` (text — the generated LaTeX), `pdfGenerated` (boolean)
-- `generationLog` (JSON — structured object: `{ rawResponse, model, timestamp, targetLanguage }`)
+- `generationLog` (JSON — structured object: `{ rawResponse, model, timestamp, targetLanguage, jobId }`)
 - `status` (GENERATED | APPLIED | INTERVIEW | OFFER | REJECTED | WITHDRAWN)
 - `notes` (text), `appliedAt`, `interviewAt`, `offerAt`, `rejectedAt`
 - `parentId` → self-referential relation for regeneration lineage
+
+**GenerationJob**
+- `id` (CUID), `createdAt`, `updatedAt`
+- `status` (PENDING | PROCESSING | COMPLETED | FAILED)
+- `error` (text) — set when job fails
+- `companyName`, `jobTitle`, `jobDescription` (text), `targetLanguage` (EN | DE)
+- `additionalContext` (text, optional), `parentId` (optional)
+- `applicationId` (string) — set when job completes successfully
+- `phase` (string) — current phase: "preparing" | "ai-working" | "finalizing"
+- `aiChars` (int) — character count from AI response (for progress tracking)
 
 **Certificate**
 - `id` (CUID), `createdAt`, `updatedAt`
@@ -96,8 +112,12 @@ Two models in PostgreSQL via Prisma:
 - `GET /api/applications/:id/download/pdf` — compile and download PDF (LuaLaTeX → pdflatex fallback)
 
 ### Generation
-- `POST /api/generate` — SSE stream. Accepts: jobDescription, companyName, jobTitle, targetLanguage, additionalContext, parentId. Returns step/complete/error events.
-- `POST /api/applications/:id/regenerate` — re-generates from parent application with optional new context/language
+- `POST /api/generate` — Fire-and-forget. Accepts: jobDescription, companyName, jobTitle, targetLanguage, additionalContext, parentId. Creates GenerationJob, returns 202 with `{ jobId, status, message }`. Processing happens asynchronously.
+- `POST /api/applications/:id/regenerate` — Creates a new GenerationJob from parent application. Returns 202 with job ID. Same fire-and-forget pattern.
+
+### Jobs
+- `GET /api/jobs` — List active (non-terminal) jobs. Returns `{ jobs: [{ id, status, companyName, jobTitle, createdAt }] }`
+- `GET /api/jobs/:id` — Get job status. Returns `{ id, status, phase, aiChars, applicationId, error, companyName, jobTitle }`
 
 ### Settings
 - `GET/POST /api/settings/context` — read/write master-cv.tex and certificates.md
@@ -122,15 +142,27 @@ Two models in PostgreSQL via Prisma:
 ## CV Generation Pipeline (Core Flow)
 
 1. User submits job description + company + title + language + optional context
-2. Server loads: master-cv.tex, certificates.md, and the generator prompt from `context/prompts/generator.md`
-3. Sends the generator prompt + assembled context to Gemini in a single LLM call (no JSON schema constraints)
-4. The prompt instructs the LLM to produce a complete, compilable LaTeX document directly, using the master CV's structure and design as a basis
-5. Server streams the response, reporting character-count progress via SSE
-6. `extractLatex()` strips markdown fences if present and validates `\begin{document}` is present
-7. LaTeX sanitization: `stripDangerousLatex()` removes dangerous commands and logs violations, `deduplicatePreamble()` removes duplicate `\usepackage` lines, `escapeLatexSpecialChars()` fixes unescaped `&` outside tabular environments
-8. Profile image: copy user's uploaded photo to generation directory, patch `\includegraphics` references
-9. Save to DB (Application record with raw LLM response in generation log) and filesystem (`generated/{id}/cv.tex`)
-10. PDF compilation happens on-demand when user downloads (not during generation)
+2. Server creates a GenerationJob record with status PENDING, returns 202 with jobId immediately
+3. User's browser polls GET /api/jobs/:id every 2 seconds for status updates
+4. Server processes generation asynchronously via setImmediate():
+   a. Loads: master-cv.tex, certificates.md, and the generator prompt from `context/prompts/generator.md`
+   b. Sends the generator prompt + assembled context to Gemini in a single LLM call (no JSON schema constraints)
+   c. Streams the response, updating job progress (phase, aiChars) every 300 chars
+   d. `extractLatex()` strips markdown fences if present and validates `\begin{document}` is present
+   e. LaTeX sanitization: `stripDangerousLatex()` removes dangerous commands and logs violations, `deduplicatePreamble()` removes duplicate `\usepackage` lines, `escapeLatexSpecialChars()` fixes unescaped `&` outside tabular environments
+   f. Profile image: copy user's uploaded photo to generation directory, patch `\includegraphics` references
+   g. Create Application record with raw LLM response in generation log, write to filesystem
+   h. Update GenerationJob to COMPLETED with applicationId, or FAILED with error message
+5. When user's polling detects COMPLETED status, show persistent toast notification and navigate to dashboard
+6. PDF compilation happens on-demand when user downloads (not during generation)
+
+### Background Generation
+
+The generation pipeline supports background processing:
+- User can navigate away from NewApplication page after submitting
+- Job ID is persisted to sessionStorage for cross-page-load continuity
+- Generation continues server-side regardless of client connection state
+- When user returns, they can see progress via polling and receive toast notification on completion
 
 ## LaTeX Compilation (On-Demand)
 
@@ -180,9 +212,12 @@ The prompt is loaded from `context/prompts/generator.md` at generation time. The
 - Single LLM pass with a consolidated prompt instead of three separate API calls — reduces latency and cost
 - Direct LaTeX output from LLM — the model produces the final LaTeX document directly using the master CV as a structural reference, giving it full control over formatting and tailoring
 - LaTeX sanitization as the primary safety gate — `stripDangerousLatex()`, `deduplicatePreamble()`, and `escapeLatexSpecialChars()` ensure safe, compilable output
-- SSE streaming for generation progress (character count, not section detection)
+- Polling-based progress tracking (GET /api/jobs/:id every 2s) instead of SSE
+- Job ID persisted to sessionStorage for resume after page refresh
+- Fire-and-forget generation with background processing — user can navigate away
 - On-demand PDF compilation (not during generation) — faster generation, compilation only when needed
 - File-based prompt storage — prompt is editable via Settings UI, no hardcoded fallback
 - Regeneration lineage via parentId — tracks iterative refinement history
 - Gemini Vision for PDF extraction (text and OCR) — no separate OCR library needed
 - Chat endpoint uses explicit `includeFullContext` flag instead of fragile keyword matching
+- Persistent toasts for important notifications (CV ready, generation failed) — user must dismiss explicitly
