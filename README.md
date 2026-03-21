@@ -7,8 +7,8 @@ CVForge is a personal, self-hosted AI-powered CV generator and job application t
 - **AI-Powered CV Tailoring** — Single-pass generation pipeline using Gemini that produces LaTeX directly from your master CV template, giving the LLM full control over formatting and tailoring for high-quality, context-aware CVs
 - **German & International Standards** — Automatically detects CV language and applies the correct conventions (German *Bewerbungskultur* vs. international/ATS-optimized format)
 - **LaTeX to PDF** — Compiles generated `.tex` files to PDF via LuaLaTeX (with pdflatex fallback)
-- **Application Tracker** — Track job applications through statuses (Generated → Applied → Interview → Offer / Rejected / Withdrawn) with notes and dates. Paginated list with 10 items per page
-- **Backup & Restore** — Export all application data as a JSON backup file. Restore from a backup with merge logic (updates existing records, creates new ones, leaves unmatched records untouched)
+- **Application Tracker** — Track job applications through statuses (Generating → Generated → Applied → Interview → Offer / Rejected / Withdrawn) with notes and dates. Paginated list with 10 items per page
+- **Backup & Restore** — Export all application data as a JSON backup file. Restore from a backup with merge logic (updates existing records, creates new ones, leaves unmatched records untouched). Includes iteration count in backup.
 - **PDF Export** — Export the full application list as a formatted PDF table
 - **Regeneration Lineage** — Regenerate CVs with additional context and track the parent/child history
 - **Certificate OCR** — Upload PDF certificates (work references, certifications, course completions) and extract structured data via Gemini Vision. Extracted certificates are stored in the database and can be synced to a context file for use in generation
@@ -32,6 +32,7 @@ CVForge is a personal, self-hosted AI-powered CV generator and job application t
 1. Clone the repository
 2. Copy `.env.example` to `.env` and fill in your values:
    - `GEMINI_API_KEY` — Google Gemini API key
+   - `APP_URL` — The URL where this app is hosted (e.g., `http://localhost:3000`)
    - `DATABASE_URL` — PostgreSQL connection string (default works with Docker Compose)
 3. Start with Docker Compose:
    ```bash

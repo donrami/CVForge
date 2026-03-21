@@ -50,6 +50,7 @@ src/                              # React SPA frontend
   hooks/
     useJobStatus.ts              # Hook for polling job status until completion or error. Manages polling lifecycle, callbacks for progress/complete/error.
     useActiveJobChecker.ts       # Hook for monitoring completed jobs when user returns to the app. Stores known job IDs in sessionStorage for cross-page-load continuity.
+  components/                     # UI components, dialogs, layout wrapper. Includes PaginationControls (Previous/Next with page info), RestoreConfirmationDialog (merge confirmation), AlertDialog, ConfirmDialog, Toast (persistent notifications), ThemeToggle, BackgroundTexture, EmptyState, CertificateUpload, CertificatePreview, and ChatPanel.
   components/                     # UI components, dialogs, layout wrapper. Includes PaginationControls (Previous/Next with page info) and RestoreConfirmationDialog (merge confirmation with application count).
   context/                        # React context providers for dialog state.
 
@@ -74,10 +75,10 @@ Three models in PostgreSQL via Prisma:
 **Application**
 - `id` (CUID), `createdAt`, `updatedAt`, `deletedAt` (soft delete)
 - `companyName`, `jobTitle`, `jobDescription` (text), `targetLanguage` (EN | DE)
-- `iterationCount`, `additionalContext` (text, optional)
+- `iterationCount` (int, default 2), `additionalContext` (text, optional)
 - `latexOutput` (text — the generated LaTeX), `pdfGenerated` (boolean)
 - `generationLog` (JSON — structured object: `{ rawResponse, model, timestamp, targetLanguage, jobId }`)
-- `status` (GENERATED | APPLIED | INTERVIEW | OFFER | REJECTED | WITHDRAWN)
+- `status` (GENERATING | GENERATED | APPLIED | INTERVIEW | OFFER | REJECTED | WITHDRAWN)
 - `notes` (text), `appliedAt`, `interviewAt`, `offerAt`, `rejectedAt`
 - `parentId` → self-referential relation for regeneration lineage
 
