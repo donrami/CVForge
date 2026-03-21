@@ -2,6 +2,8 @@
 
 CVForge is a personal, self-hosted AI-powered CV generator and job application tracker. Paste a job description, and it uses your master CV plus context documents to produce a tailored, publication-ready LaTeX CV — compiled to PDF automatically.
 
+![CVForge Dashboard](183shots_so.png)
+
 ## Features
 
 - **AI-Powered CV Tailoring** — Single-pass generation pipeline using Gemini that produces LaTeX directly from your master CV template, giving the LLM full control over formatting and tailoring for high-quality, context-aware CVs
