@@ -43,16 +43,15 @@ server/
 src/                              # React SPA frontend
   pages/
     Dashboard.tsx                 # Lists applications with pagination (10 per page). Toolbar with Backup (JSON), Export PDF, and Restore buttons. Search filter resets to page 1. Restore flow: file picker → confirmation dialog → upload → refresh.
-    NewApplication.tsx            # Form: company name, job title, job description, target language (EN/DE), additional context. Uses job-based generation with polling for progress. User can navigate away while generation continues in background.
+    NewApplication.tsx            # Form: company name, job title, job description, target language (EN/DE), additional context. Uses job-based generation with polling for progress. User can navigate away while generation continues in background. Includes duplicate detection.
     ApplicationDetail.tsx         # View application details, download PDF/TEX, update status/notes/dates, regenerate with additional context.
     Settings.tsx                 # Tabs: Master CV editor, Certificate management (upload/extract/edit/sync), Profile image upload, Prompt editor (generator with reset-to-defaults).
-    Login.tsx                    # (Removed — no auth needed for self-hosted use)
+    Login.tsx                    # Password-based authentication page using master password from APP_PASSWORD env var. Protects access to the application.
   hooks/
     useJobStatus.ts              # Hook for polling job status until completion or error. Manages polling lifecycle, callbacks for progress/complete/error.
     useActiveJobChecker.ts       # Hook for monitoring completed jobs when user returns to the app. Stores known job IDs in sessionStorage for cross-page-load continuity.
   components/                     # UI components, dialogs, layout wrapper. Includes PaginationControls (Previous/Next with page info), RestoreConfirmationDialog (merge confirmation), AlertDialog, ConfirmDialog, Toast (persistent notifications), ThemeToggle, BackgroundTexture, EmptyState, CertificateUpload, CertificatePreview, and ChatPanel.
-  components/                     # UI components, dialogs, layout wrapper. Includes PaginationControls (Previous/Next with page info) and RestoreConfirmationDialog (merge confirmation with application count).
-  context/                        # React context providers for dialog state.
+  context/                        # React context providers: AuthContext (authentication state management via sessionStorage), DialogContext (dialog state for toasts, confirms, alerts).
 
 context/                          # User context files (gitignored, persisted via Docker volumes)
   master-cv.tex                   # The user's base LaTeX CV template — source of truth for all generations. German-language, uses LuaLaTeX with fontspec, paracol two-column layout, Roboto font.
@@ -103,6 +102,7 @@ Three models in PostgreSQL via Prisma:
 
 ### Applications
 - `GET /api/applications` — paginated list (skip/take, default 10 per page), excludes soft-deleted, returns `{ applications, total, skip, take }`
+- `POST /api/applications/check-duplicate` — fuzzy duplicate detection using string similarity. Accepts jobDescription, companyName, jobTitle. Returns `{ isDuplicate, similarity, duplicateOf }` with match confidence. Uses 70% threshold for potential duplicates.
 - `GET /api/applications/backup` — download JSON backup of all non-deleted applications (Content-Disposition: `cvforge-backup-YYYY-MM-DD.json`)
 - `POST /api/applications/restore` — upload JSON backup (multipart/form-data), validates structure, merges via upsert, returns `{ success, created, updated }`
 - `GET /api/applications/export/pdf` — download PDF export of all non-deleted applications (Content-Disposition: `cvforge-applications-YYYY-MM-DD.pdf`)
@@ -222,3 +222,4 @@ The prompt is loaded from `context/prompts/generator.md` at generation time. The
 - Gemini Vision for PDF extraction (text and OCR) — no separate OCR library needed
 - Chat endpoint uses explicit `includeFullContext` flag instead of fragile keyword matching
 - Persistent toasts for important notifications (CV ready, generation failed) — user must dismiss explicitly
+- Fuzzy duplicate detection via string-similarity — compares job descriptions and titles against existing applications to prevent duplicate entries

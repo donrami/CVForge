@@ -10,6 +10,7 @@ CVForge is a personal, self-hosted AI-powered CV generator and job application t
 - **German & International Standards** — Automatically detects CV language and applies the correct conventions (German *Bewerbungskultur* vs. international/ATS-optimized format)
 - **LaTeX to PDF** — Compiles generated `.tex` files to PDF via LuaLaTeX (with pdflatex fallback)
 - **Application Tracker** — Track job applications through statuses (Generating → Generated → Applied → Interview → Offer / Rejected / Withdrawn) with notes and dates. Paginated list with 10 items per page
+- **Duplicate Detection** — Fuzzy matching against existing applications when creating new ones, using string similarity to detect potential duplicates before generation
 - **Backup & Restore** — Export all application data as a JSON backup file. Restore from a backup with merge logic (updates existing records, creates new ones, leaves unmatched records untouched). Includes iteration count in backup.
 - **PDF Export** — Export the full application list as a formatted PDF table
 - **Regeneration Lineage** — Regenerate CVs with additional context and track the parent/child history
@@ -19,6 +20,7 @@ CVForge is a personal, self-hosted AI-powered CV generator and job application t
 - **LaTeX Sanitizer** — AI-generated LaTeX is stripped of dangerous commands (`\input`, `\write18`, etc.) and special characters are escaped before compilation
 - **Structured Logging** — Pino-based JSON logging throughout the server
 - **Chat Assistant** — Interactive AI chat interface for prompt refinement and CV advice
+- **Password Protection** — Optional master password authentication via `APP_PASSWORD` environment variable
 
 ## Tech Stack
 
@@ -36,6 +38,7 @@ CVForge is a personal, self-hosted AI-powered CV generator and job application t
    - `GEMINI_API_KEY` — Google Gemini API key
    - `APP_URL` — The URL where this app is hosted (e.g., `http://localhost:3000`)
    - `DATABASE_URL` — PostgreSQL connection string (default works with Docker Compose)
+   - `APP_PASSWORD` — (optional) Master password for authentication. If not set, no password is required.
 3. Start with Docker Compose:
    ```bash
    docker compose up --build -d
@@ -61,7 +64,7 @@ npm run dev
 ```
 ├── server.ts              # Express server entry point
 ├── server/
-│   ├── routes.ts          # API routes (applications, settings, backup/restore, PDF export, prompts)
+│   ├── routes.ts          # API routes (applications, settings, backup/restore, PDF export, prompts, duplicate detection)
 │   ├── generate.ts        # CV generation pipeline (direct LaTeX output from LLM)
 │   ├── certificates.ts    # Certificate CRUD + OCR extraction + context sync
 │   ├── middleware/         # Multer upload config
@@ -79,9 +82,10 @@ npm run dev
 │       ├── template-deriver.ts       # Auto-derives Handlebars templates from LaTeX
 │       └── logger.ts                 # Pino logger
 ├── src/                   # React frontend
-│   ├── pages/             # Dashboard, NewApplication, ApplicationDetail, Settings
+│   ├── pages/             # Dashboard, NewApplication, ApplicationDetail, Settings, Login
 │   ├── components/        # UI components (PaginationControls, RestoreConfirmationDialog), dialogs, layout
-│   └── context/           # Dialog context providers
+│   ├── context/           # DialogContext, AuthContext (sessionStorage-based auth state)
+│   └── hooks                 # useJobStatus, useActiveJobChecker
 ├── context/               # User context files (master CV, certificates, prompts)
 ├── prisma/schema.prisma   # Database schema
 ├── generated/             # Runtime output (LaTeX + PDF per application)
