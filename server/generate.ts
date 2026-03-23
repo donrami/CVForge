@@ -8,6 +8,7 @@ import { logger } from './services/logger.js';
 import { prepareProfileImage } from './services/profile-image.js';
 import { loadAllPrompts } from './services/prompts.js';
 import { createJob, startJob, updateJobProgress, completeJob, failJob, JobProgress } from './services/job.js';
+import { getGenDir } from './utils/gen-dir.js';
 
 export const generateRouter = Router();
 
@@ -138,12 +139,8 @@ IMPORTANT: Always use TARGET LANGUAGE = "${promptLanguage}" for the output forma
     latexOutput = deduplicatePreamble(latexOutput);
     latexOutput = escapeLatexSpecialChars(latexOutput);
 
-    // Profile image handling
-    const genDir = path.join(process.cwd(), 'generated', Date.now().toString());
-    await fs.mkdir(genDir, { recursive: true });
-    latexOutput = await prepareProfileImage(latexOutput, genDir);
-
-    // Create application record
+    // Create application record FIRST to get the ID for folder naming
+    // This ensures the folder path is consistent between generation and retrieval
     const app = await prisma.application.create({
       data: {
         companyName,
@@ -163,6 +160,11 @@ IMPORTANT: Always use TARGET LANGUAGE = "${promptLanguage}" for the output forma
         parentId,
       },
     });
+
+    // Profile image handling - use consistent folder path with app ID
+    const genDir = getGenDir(app);
+    await fs.mkdir(genDir, { recursive: true });
+    latexOutput = await prepareProfileImage(latexOutput, genDir);
 
     // Write LaTeX to file
     await fs.writeFile(path.join(genDir, 'cv.tex'), latexOutput);

@@ -13,8 +13,12 @@ import { generateBackup } from './services/backup.js';
 import { validateBackupFile, restoreFromBackup } from './services/restore.js';
 import { generateApplicationsPDF } from './services/pdf-export.js';
 import { getJob, getActiveJobsSummary } from './services/job.js';
+import { getGenDir } from './utils/gen-dir.js';
+import stringSimilarity from 'string-similarity';
 
 const execFileAsync = util.promisify(execFile);
+
+const DUPLICATE_THRESHOLD = 0.7; // 70% similarity = potential duplicate
 
 /** Sanitize a string for use in Content-Disposition filename */
 function safeFilename(name: string): string {
@@ -70,20 +74,92 @@ apiRouter.get('/jobs/:id', requireAuth, async (req, res) => {
   }
 });
 
+// Fuzzy duplicate detection
+apiRouter.post('/applications/check-duplicate', requireAuth, async (req, res) => {
+  try {
+    const { jobDescription, companyName, jobTitle } = req.body;
+    
+    if (!jobDescription || typeof jobDescription !== 'string') {
+      return res.status(400).json({ error: 'jobDescription is required' });
+    }
+    
+    // Fetch all existing applications
+    const existingApps = await prisma.application.findMany({
+      where: { deletedAt: null },
+      select: {
+        id: true,
+        companyName: true,
+        jobTitle: true,
+        jobDescription: true,
+      },
+    });
+    
+    // Normalize the input text
+    const normalizeText = (text: string) => {
+      return text
+        .toLowerCase()
+        .replace(/\s+/g, ' ')
+        .trim();
+    };
+    
+    const normalizedInput = normalizeText(jobDescription);
+    
+    // Find matches
+    const matches = [];
+    
+    for (const app of existingApps) {
+      if (!app.jobDescription) continue;
+      
+      const normalizedExisting = normalizeText(app.jobDescription);
+      const similarity = stringSimilarity.compareTwoStrings(normalizedInput, normalizedExisting);
+      
+      if (similarity >= DUPLICATE_THRESHOLD) {
+        matches.push({
+          id: app.id,
+          companyName: app.companyName,
+          jobTitle: app.jobTitle,
+          similarity: Math.round(similarity * 100) / 100,
+        });
+      }
+    }
+    
+    // Sort by similarity descending
+    matches.sort((a, b) => b.similarity - a.similarity);
+    
+    res.json({
+      hasDuplicate: matches.length > 0,
+      matches: matches.slice(0, 5), // Return top 5 matches
+    });
+  } catch (e) {
+    errorResponse(res, 500, e, 'DUPLICATE_CHECK_ERROR');
+  }
+});
+
 // Applications Routes
 apiRouter.get('/applications', requireAuth, async (req, res) => {
   try {
     const skip = Math.max(0, parseInt(req.query.skip as string) || 0);
     const take = Math.min(100, Math.max(1, parseInt(req.query.take as string) || 10));
+    const search = req.query.search as string | undefined;
+
+    const where: Record<string, any> = { deletedAt: null };
+    
+    if (search && search.trim()) {
+      const searchTerm = search.trim();
+      where.OR = [
+        { companyName: { contains: searchTerm, mode: 'insensitive' } },
+        { jobTitle: { contains: searchTerm, mode: 'insensitive' } },
+      ];
+    }
 
     const [applications, total] = await Promise.all([
       prisma.application.findMany({
-        where: { deletedAt: null },
+        where,
         orderBy: { createdAt: 'desc' },
         skip,
         take,
       }),
-      prisma.application.count({ where: { deletedAt: null } }),
+      prisma.application.count({ where }),
     ]);
     res.json({ applications, total, skip, take });
   } catch (e) {
@@ -215,9 +291,12 @@ apiRouter.patch('/applications/:id', requireAuth, async (req, res) => {
         });
       }
       updateData.pdfGenerated = false;
-      const genDir = path.join(process.cwd(), 'generated', req.params.id);
-      await fs.rm(path.join(genDir, 'cv.tex'), { force: true });
-      await fs.rm(path.join(genDir, 'cv.pdf'), { force: true });
+      const app = await prisma.application.findUnique({ where: { id: req.params.id } });
+      if (app) {
+        const genDir = getGenDir(app);
+        await fs.rm(path.join(genDir, 'cv.tex'), { force: true });
+        await fs.rm(path.join(genDir, 'cv.pdf'), { force: true });
+      }
     }
 
     const app = await prisma.application.update({
@@ -238,8 +317,11 @@ apiRouter.delete('/applications/:id', requireAuth, async (req, res) => {
     });
 
     // Remove generated files from disk
-    const genDir = path.join(process.cwd(), 'generated', req.params.id);
-    await fs.rm(genDir, { recursive: true, force: true });
+    const app = await prisma.application.findUnique({ where: { id: req.params.id } });
+    if (app) {
+      const genDir = getGenDir(app);
+      await fs.rm(genDir, { recursive: true, force: true });
+    }
 
     res.json({ success: true });
   } catch (e) {
@@ -265,7 +347,7 @@ apiRouter.get('/applications/:id/download/pdf', requireAuth, async (req, res) =>
     const app = await prisma.application.findUnique({ where: { id: req.params.id, deletedAt: null } });
     if (!app) return res.status(404).json({ error: 'Not found', code: 'NOT_FOUND' });
     
-    const genDir = path.join(process.cwd(), 'generated', app.id);
+    const genDir = getGenDir(app);
     const pdfPath = path.join(genDir, 'cv.pdf');
     const texPath = path.join(genDir, 'cv.tex');
     

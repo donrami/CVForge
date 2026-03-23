@@ -39,7 +39,14 @@ export async function prepareProfileImage(
   if (userProfileImage) {
     const ext = path.extname(userProfileImage);
     const destFilename = `profile${ext}`;
-    await fs.copyFile(userProfileImage, path.join(genDir, destFilename));
+    const destPath = path.join(genDir, destFilename);
+    
+    // Only copy if not already present (avoids redundant copies on regeneration)
+    try {
+      await fs.access(destPath);
+    } catch {
+      await fs.copyFile(userProfileImage, destPath);
+    }
 
     return latexContent.replace(
       imageRegex,

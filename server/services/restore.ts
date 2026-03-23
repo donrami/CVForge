@@ -1,5 +1,39 @@
 import { prisma } from '../../server.js';
 import type { BackupData, BackupApplication } from './backup.js';
+import { getGenDir } from '../utils/gen-dir.js';
+import fs from 'fs/promises';
+import path from 'path';
+import { logger } from './logger.js';
+
+/**
+ * Ensures that the generated folder for an application exists.
+ * If the folder is missing, creates it and writes the cv.tex file
+ * with the latexOutput from the database.
+ */
+async function ensureFolderExists(app: BackupApplication): Promise<void> {
+  const genDir = getGenDir(app);
+  
+  // Check if folder already exists
+  try {
+    await fs.access(genDir);
+    return; // Folder exists, nothing to do
+  } catch {
+    // Folder doesn't exist, create it with cv.tex
+    await fs.mkdir(genDir, { recursive: true });
+    
+    // Write the LaTeX content to cv.tex
+    // Note: The backup includes latexOutput in the database record
+    // We need to fetch the full application to get latexOutput
+    const fullApp = await prisma.application.findUnique({
+      where: { id: app.id },
+      select: { latexOutput: true },
+    });
+    
+    if (fullApp?.latexOutput) {
+      await fs.writeFile(path.join(genDir, 'cv.tex'), fullApp.latexOutput);
+    }
+  }
+}
 
 export interface RestoreResult {
   created: number;
@@ -18,6 +52,9 @@ const REQUIRED_FIELDS: (keyof BackupApplication)[] = [
   'createdAt',
   'updatedAt',
 ];
+
+// genDir was added in version 1.1 - it's optional for backwards compatibility
+export const BACKUP_VERSION_WITH_GENDIR = '1.1';
 
 /** ISO 8601 date-time regex (e.g. 2024-01-15T10:30:00.000Z) */
 const ISO_8601_REGEX = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})$/;
@@ -92,6 +129,17 @@ export function validateBackupFile(data: unknown): BackupData {
         throw new Error(`Application at index ${i} has invalid ${field} date`);
       }
     }
+
+    // Validate genDir if present (optional - added in backup version 1.1)
+    if (record.genDir !== undefined) {
+      if (typeof record.genDir !== 'string') {
+        throw new Error(`Application at index ${i} has invalid genDir - must be a string`);
+      }
+      // Basic path validation - should contain 'generated' and the app id
+      if (!record.genDir.includes('generated') || !record.genDir.includes(record.id as string)) {
+        throw new Error(`Application at index ${i} has invalid genDir path`);
+      }
+    }
   }
 
   return data as BackupData;
@@ -151,6 +199,16 @@ export async function restoreFromBackup(backup: BackupData): Promise<RestoreResu
       });
     }),
   );
+
+  // Ensure folder structure exists for all restored applications
+  for (const app of backup.applications) {
+    try {
+      await ensureFolderExists(app);
+    } catch (err) {
+      logger.error({ err, appId: app.id }, 'Failed to ensure folder exists after restore');
+      // Don't fail the whole restore if folder creation fails
+    }
+  }
 
   return { created, updated };
 }

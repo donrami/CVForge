@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useEffect, useState, useCallback } from 'react';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { FileText, Download, ArrowLeft, Save, Check } from 'lucide-react';
 import { format } from 'date-fns';
 
@@ -24,16 +24,20 @@ const STATUSES = ['GENERATED', 'APPLIED', 'INTERVIEW', 'OFFER', 'REJECTED', 'WIT
 
 export function ApplicationDetail() {
   const { id } = useParams();
+  const navigate = useNavigate();
   const [app, setApp] = useState<Application | null>(null);
   const [notes, setNotes] = useState('');
   const [status, setStatus] = useState('');
+  const [originalNotes, setOriginalNotes] = useState('');
+  const [originalStatus, setOriginalStatus] = useState('');
   const [saving, setSaving] = useState(false);
   const [latexSource, setLatexSource] = useState('');
   const [savedLatexSource, setSavedLatexSource] = useState('');
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'success' | 'error'>('idle');
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [showUnsavedWarning, setShowUnsavedWarning] = useState(false);
 
-  const isDirty = latexSource !== savedLatexSource;
+  const isDirty = notes !== originalNotes || status !== originalStatus || latexSource !== savedLatexSource;
 
   useEffect(() => {
     fetch(`/api/applications/${id}`)
@@ -41,11 +45,35 @@ export function ApplicationDetail() {
       .then(data => {
         setApp(data);
         setNotes(data.notes || '');
+        setOriginalNotes(data.notes || '');
         setStatus(data.status);
+        setOriginalStatus(data.status);
         setLatexSource(data.latexOutput || '');
         setSavedLatexSource(data.latexOutput || '');
       });
   }, [id]);
+
+  // Warn on navigation with unsaved changes
+  useEffect(() => {
+    if (!isDirty) return;
+    
+    const handleBeforeNavigate = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = '';
+    };
+    
+    window.addEventListener('beforeunload', handleBeforeNavigate);
+    return () => window.removeEventListener('beforeunload', handleBeforeNavigate);
+  }, [isDirty]);
+
+  // Custom navigation with warning
+  const handleNavigate = useCallback((to: string) => {
+    if (isDirty) {
+      setShowUnsavedWarning(true);
+      return;
+    }
+    navigate(to);
+  }, [isDirty, navigate]);
 
   const handleSave = async () => {
     setSaving(true);
@@ -92,13 +120,6 @@ export function ApplicationDetail() {
   }
   const isLegacy = Array.isArray(rawLog);
 
-  const statusSegmentClass = (s: string) =>
-    `px-3 py-1.5 font-mono text-[11px] uppercase tracking-wider border transition-colors ${
-      status === s
-        ? 'bg-accent text-text-on-accent border-accent'
-        : 'bg-transparent text-text-secondary border-border hover:text-text-primary'
-    }`;
-
   return (
     <div className="space-y-6 max-w-5xl mx-auto">
       <div className="flex items-center gap-4 text-text-secondary mb-4">
@@ -120,7 +141,7 @@ export function ApplicationDetail() {
           <h1 className="text-[2.5rem] font-serif text-text-primary tracking-tight leading-tight">{app.companyName}</h1>
           <p className="text-xl text-text-secondary mt-1">{app.jobTitle}</p>
         </div>
-        <div className="flex gap-3">
+        <div className="flex gap-3 items-center">
           <a
             href={`/api/applications/${app.id}/download/tex`}
             className="flex items-center gap-2 px-4 py-2 border border-border text-text-secondary font-mono text-xs uppercase tracking-wider hover:text-text-primary transition-colors"
@@ -135,6 +156,14 @@ export function ApplicationDetail() {
             <Download size={16} />
             PDF
           </a>
+          <button
+            onClick={handleSave}
+            disabled={!isDirty || saving}
+            className="flex items-center gap-2 bg-accent hover:bg-accent-hover text-text-on-accent font-medium px-6 py-2.5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <Save size={16} />
+            {saving ? 'Saving...' : 'Save Changes'}
+          </button>
         </div>
       </div>
 
@@ -274,43 +303,28 @@ export function ApplicationDetail() {
         </div>
 
         <div className="space-y-6">
-          <section className="bg-bg-surface border border-border p-6 space-y-6 surface-card">
-            <div className="flex justify-between items-center">
-              <h2 className="font-mono text-[11px] uppercase tracking-wider text-text-secondary">Status</h2>
-              {saving && <Check size={16} className="text-success" />}
-            </div>
+          <section className="bg-bg-surface border border-border p-6 space-y-4 surface-card">
+            <h2 className="font-mono text-[11px] uppercase tracking-wider text-text-secondary">Status</h2>
             
-            <div className="space-y-4">
-              <div className="flex flex-wrap gap-0">
-                {STATUSES.map(s => (
-                  <button
-                    key={s}
-                    onClick={() => setStatus(s)}
-                    className={statusSegmentClass(s)}
-                  >
-                    {s}
-                  </button>
-                ))}
-              </div>
+            <select
+              value={status}
+              onChange={e => setStatus(e.target.value)}
+              className="w-full bg-bg-base border border-border px-4 py-2.5 text-text-primary focus:outline-none focus:border-accent transition-colors font-mono text-sm"
+            >
+              {STATUSES.map(s => (
+                <option key={s} value={s}>{s}</option>
+              ))}
+            </select>
 
-              <div className="space-y-2">
-                <label className="block font-mono text-[11px] uppercase tracking-wider text-text-secondary">Notes</label>
-                <textarea
-                  rows={4}
-                  value={notes}
-                  onChange={e => setNotes(e.target.value)}
-                  className="w-full bg-bg-base border border-border px-4 py-3 text-text-primary focus:outline-none focus:border-accent transition-colors resize-y text-sm inset-surface"
-                  placeholder="Interview dates, salary expectations..."
-                />
-              </div>
-
-              <button
-                onClick={handleSave}
-                className="w-full flex justify-center items-center gap-2 border border-border text-text-primary font-mono text-xs uppercase tracking-wider px-4 py-2 hover:bg-bg-elevated transition-colors"
-              >
-                <Save size={14} />
-                Save Changes
-              </button>
+            <div className="space-y-2">
+              <label className="block font-mono text-[11px] uppercase tracking-wider text-text-secondary">Notes</label>
+              <textarea
+                rows={4}
+                value={notes}
+                onChange={e => setNotes(e.target.value)}
+                className="w-full bg-bg-base border border-border px-4 py-3 text-text-primary focus:outline-none focus:border-accent transition-colors resize-y text-sm inset-surface"
+                placeholder="Interview dates, salary expectations..."
+              />
             </div>
           </section>
 
@@ -333,6 +347,35 @@ export function ApplicationDetail() {
           </section>
         </div>
       </div>
+
+      {/* Unsaved changes warning dialog */}
+      {showUnsavedWarning && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-bg-surface border border-border p-6 max-w-md w-full">
+            <h3 className="text-lg font-serif text-text-primary mb-2">Unsaved Changes</h3>
+            <p className="text-sm text-text-secondary mb-4">
+              You have unsaved changes. Are you sure you want to leave?
+            </p>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => setShowUnsavedWarning(false)}
+                className="px-4 py-2 border border-border text-text-secondary font-mono text-xs uppercase tracking-wider hover:bg-bg-elevated transition-colors"
+              >
+                Stay
+              </button>
+              <button
+                onClick={() => {
+                  setShowUnsavedWarning(false);
+                  navigate(-1);
+                }}
+                className="px-4 py-2 bg-destructive text-text-on-accent font-mono text-xs uppercase tracking-wider hover:bg-destructive/90 transition-colors"
+              >
+                Discard & Leave
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

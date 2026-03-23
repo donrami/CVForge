@@ -33,10 +33,25 @@ function StatusIcon({ status }: { status: 'idle' | 'started' | 'polling' | 'comp
   return <Loader2 className="animate-spin text-accent" size={20} />;
 }
 
+interface DuplicateMatch {
+  id: string;
+  companyName: string;
+  jobTitle: string;
+  similarity: number;
+}
+
+interface DuplicateWarning {
+  hasDuplicate: boolean;
+  matches: DuplicateMatch[];
+}
+
 export function NewApplication() {
   const navigate = useNavigate();
   const { toast } = useDialog();
   const [loadingLast, setLoadingLast] = useState(false);
+  const [duplicateWarning, setDuplicateWarning] = useState<DuplicateWarning | null>(null);
+  const [showDuplicateDialog, setShowDuplicateDialog] = useState(false);
+  const [isCheckingDuplicate, setIsCheckingDuplicate] = useState(false);
   const [formData, setFormData] = useState({
     companyName: '',
     jobTitle: '',
@@ -67,7 +82,7 @@ export function NewApplication() {
   const handleJobComplete = useCallback((applicationId: string, companyName?: string, _jobTitle?: string) => {
     clearPersistedJobId(); // Clear persisted job ID on completion
     const company = companyName || formData.companyName;
-    toast(`CV for ${company} is ready!`, 'success', 0, true); // Persistent toast
+    toast(`CV for ${company} is ready!`, 'success');
     setGenerationState(prev => ({
       ...prev,
       status: 'complete',
@@ -80,7 +95,7 @@ export function NewApplication() {
   }, [navigate, toast, formData.companyName]);
 
   const handleJobError = useCallback((error: string) => {
-    toast(`Generation failed: ${error}`, 'error', 0, true); // Persistent toast
+    toast(`Generation failed: ${error}`, 'error');
     setGenerationState(prev => ({
       ...prev,
       status: 'error',
@@ -116,9 +131,8 @@ export function NewApplication() {
     }
   }, [generationState.status, startPolling]);
 
-  const handleSubmit = useCallback(async (e: React.FormEvent) => {
-    e.preventDefault();
-    
+  // Helper function to start generation with current formData
+  const startGeneration = useCallback(async (data: typeof formData) => {
     setGenerationState({
       status: 'started',
       jobId: null,
@@ -133,16 +147,16 @@ export function NewApplication() {
       const response = await fetch('/api/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(data),
       });
 
       if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || 'Failed to start generation');
+        const responseData = await response.json();
+        throw new Error(responseData.error || 'Failed to start generation');
       }
 
-      const data = await response.json();
-      const jobId = data.jobId;
+      const responseData = await response.json();
+      const jobId = responseData.jobId;
 
       setGenerationState(prev => ({
         ...prev,
@@ -158,7 +172,54 @@ export function NewApplication() {
     } catch (err: any) {
       handleJobError(err.message);
     }
-  }, [formData, startPolling, handleJobError]);
+  }, [startPolling, handleJobError]);
+
+  const handleSubmit = useCallback(async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    // Check for duplicates first
+    if (formData.jobDescription.trim().length > 20) {
+      setIsCheckingDuplicate(true);
+      try {
+        const res = await fetch('/api/applications/check-duplicate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            jobDescription: formData.jobDescription,
+            companyName: formData.companyName,
+            jobTitle: formData.jobTitle,
+          }),
+        });
+        const data = await res.json();
+        
+        if (data.hasDuplicate) {
+          setDuplicateWarning(data);
+          setShowDuplicateDialog(true);
+          setIsCheckingDuplicate(false);
+          return; // Don't proceed - wait for user confirmation
+        }
+      } catch {
+        // Silently fail - duplicate check is non-critical, proceed with generation
+      }
+      setIsCheckingDuplicate(false);
+    }
+    
+    // No duplicates or check failed - proceed with generation
+    startGeneration(formData);
+  }, [formData, startGeneration]);
+
+  const handleDuplicateConfirm = useCallback(() => {
+    setShowDuplicateDialog(false);
+    setDuplicateWarning(null);
+    // Proceed with generation after user confirms
+    startGeneration(formData);
+  }, [formData, startGeneration]);
+
+  const handleDuplicateCancel = useCallback(() => {
+    setShowDuplicateDialog(false);
+    setDuplicateWarning(null);
+    // Don't proceed - user cancelled
+  }, []);
 
   const handleCancel = useCallback(() => {
     stopPolling();
@@ -406,13 +467,72 @@ export function NewApplication() {
             </button>
             <button 
               type="submit"
-              className="flex items-center gap-2 bg-accent hover:bg-accent-hover text-text-on-accent font-medium px-6 py-2.5 transition-colors"
+              disabled={isCheckingDuplicate}
+              className="flex items-center gap-2 bg-accent hover:bg-accent-hover text-text-on-accent font-medium px-6 py-2.5 transition-colors disabled:opacity-60"
             >
-              Generate CV
-              <ArrowRight size={18} />
+              {isCheckingDuplicate ? (
+                <>
+                  <Loader2 className="animate-spin" size={18} />
+                  Checking...
+                </>
+              ) : (
+                <>
+                  Generate CV
+                  <ArrowRight size={18} />
+                </>
+              )}
             </button>
           </div>
         </form>
+      )}
+
+      {/* Duplicate Confirmation Dialog */}
+      {showDuplicateDialog && duplicateWarning && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+          <div className="bg-bg-surface border border-border shadow-2xl max-w-md w-full animate-in zoom-in-95 duration-200">
+            <div className="p-6">
+              <div className="flex items-start gap-4">
+                <div className="shrink-0 w-10 h-10 rounded-full bg-yellow-500/10 flex items-center justify-center">
+                  <span className="text-yellow-500 text-xl">⚠️</span>
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-lg font-medium text-text-primary mb-2">
+                    Potential Duplicate Detected
+                  </h3>
+                  <p className="text-sm text-text-secondary leading-relaxed">
+                    This job description is similar to existing applications. Do you want to generate a new CV anyway?
+                  </p>
+                  
+                  <div className="mt-4 p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-md">
+                    <ul className="space-y-2">
+                      {duplicateWarning.matches.slice(0, 3).map((match) => (
+                        <li key={match.id} className="text-xs">
+                          • <span className="font-medium text-text-primary">{match.companyName}</span> - {match.jobTitle}{' '}
+                          <span className="text-text-muted">(~{Math.round(match.similarity * 100)}% match)</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="px-6 py-4 bg-bg-elevated/50 border-t border-border flex justify-end gap-3">
+              <button
+                onClick={handleDuplicateCancel}
+                className="px-4 py-2 text-sm font-medium text-text-secondary hover:text-text-primary transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDuplicateConfirm}
+                className="px-4 py-2 text-sm font-medium bg-accent hover:bg-accent-hover text-text-on-accent transition-colors"
+              >
+                Generate Anyway
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

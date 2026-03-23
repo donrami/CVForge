@@ -1,4 +1,5 @@
 import { prisma } from '../../server.js';
+import { getGenDir } from '../utils/gen-dir.js';
 
 export interface BackupApplication {
   id: string;
@@ -13,6 +14,7 @@ export interface BackupApplication {
   interviewAt: string | null;
   offerAt: string | null;
   rejectedAt: string | null;
+  genDir: string; // Path to generated folder for this application
 }
 
 export interface BackupData {
@@ -57,6 +59,7 @@ export async function generateBackup(): Promise<BackupData> {
       interviewAt: app.interviewAt?.toISOString() ?? null,
       offerAt: app.offerAt?.toISOString() ?? null,
       rejectedAt: app.rejectedAt?.toISOString() ?? null,
+      genDir: getGenDir(app), // Include the generated folder path for restore
     })),
   };
 }

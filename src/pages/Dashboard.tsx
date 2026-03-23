@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { FileText, Plus, Search, Filter, Download, RefreshCw, Trash2, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useDialog } from '../context/DialogContext';
@@ -18,6 +18,7 @@ interface Application {
 }
 
 export function Dashboard() {
+  const navigate = useNavigate();
   const [apps, setApps] = useState<Application[]>([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
@@ -36,7 +37,8 @@ export function Dashboard() {
 
   useEffect(() => {
     const skip = (currentPage - 1) * pageSize;
-    fetch(`/api/applications?skip=${skip}&take=${pageSize}`)
+    const searchParam = search.trim() ? `&search=${encodeURIComponent(search.trim())}` : '';
+    fetch(`/api/applications?skip=${skip}&take=${pageSize}${searchParam}`)
       .then(res => {
         if (!res.ok) throw new Error('Failed to fetch applications');
         return res.json();
@@ -50,7 +52,7 @@ export function Dashboard() {
         toast('Failed to load applications', 'error');
         setLoading(false);
       });
-  }, [currentPage, pageSize]);
+  }, [currentPage, pageSize, search]);
 
   useEffect(() => {
     if (highlightedId) {
@@ -114,11 +116,6 @@ export function Dashboard() {
       setExportLoading(false);
     }
   };
-
-  const filteredApps = apps.filter(app =>
-    app.companyName.toLowerCase().includes(search.toLowerCase()) ||
-    app.jobTitle.toLowerCase().includes(search.toLowerCase())
-  );
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
@@ -274,19 +271,18 @@ export function Dashboard() {
           <tbody>
             {loading ? (
               <tr><td colSpan={6} className="p-8 text-center text-text-muted font-mono text-sm">Loading...</td></tr>
-            ) : filteredApps.length === 0 ? (
-              <tr><td colSpan={6}><EmptyState message="No applications found." /></td></tr>
-            ) : filteredApps.map(app => (
+            ) : apps.length === 0 ? (
+              <tr><td colSpan={6}><EmptyState message={search ? 'No applications match your search.' : 'No applications found.'} /></td></tr>
+            ) : apps.map(app => (
               <tr 
                 key={app.id} 
-                className={`border-b border-border hover:bg-bg-elevated transition-colors group ${
+                onClick={() => navigate(`/applications/${app.id}`)}
+                className={`border-b border-border hover:bg-bg-elevated transition-colors cursor-pointer group ${
                   highlightedId === app.id ? 'flash-highlight' : ''
                 }`}
               >
                 <td className="p-4 font-medium text-text-primary">
-                  <Link to={`/applications/${app.id}`} className="hover:text-accent transition-colors">
-                    {app.companyName}
-                  </Link>
+                  {app.companyName}
                 </td>
                 <td className="p-4 text-text-primary">{app.jobTitle}</td>
                 <td className="p-4">
@@ -296,7 +292,7 @@ export function Dashboard() {
                 <td className="p-4 text-text-secondary font-mono text-sm whitespace-nowrap">
                   {format(new Date(app.createdAt), 'dd.MM.yyyy')}
                 </td>
-                <td className="p-4 text-right whitespace-nowrap space-x-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                <td className="p-4 text-right whitespace-nowrap space-x-2 opacity-0 group-hover:opacity-100 transition-opacity" onClick={e => e.stopPropagation()}>
                   <a href={`/api/applications/${app.id}/download/tex`} className="inline-flex p-2 text-text-muted hover:text-accent transition-colors" title="Download TEX">
                     <FileText size={16} />
                   </a>
