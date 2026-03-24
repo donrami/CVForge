@@ -209,33 +209,31 @@ export function Dashboard() {
     setRestoreAppCount(0);
   };
 
-  const toolbarBtnClass = "flex items-center gap-2 px-3 py-1.5 border border-border text-text-secondary font-mono text-xs uppercase tracking-wider hover:text-text-primary hover:border-text-muted transition-colors disabled:opacity-40 disabled:cursor-not-allowed";
+  const toolbarBtnClass = "btn-ghost";
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-end pb-6 border-b border-border">
-        <div>
-          <h1 className="text-[2.5rem] font-serif text-text-primary tracking-tight leading-tight">Applications</h1>
-          <p className="text-text-secondary mt-1">Track and manage your generated CVs</p>
-        </div>
+    <div className="space-y-8">
+      <div className="page-header">
+        <h1 className="page-title">Applications</h1>
+        <p className="page-subtitle">Track and manage your generated CVs</p>
         <Link 
           to="/new" 
-          className="flex items-center gap-2 bg-accent hover:bg-accent-hover text-text-on-accent font-medium px-4 py-2 transition-colors"
+          className="btn-primary"
         >
           <Plus size={18} />
           New Application
         </Link>
       </div>
 
-      <div className="flex gap-3 items-center">
-        <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-0 top-1/2 -translate-y-1/2 text-text-muted" size={16} />
+      <div className="toolbar">
+        <div className="search-wrapper">
+          <Search className="search-icon" size={16} />
           <input 
             type="text" 
             placeholder="Search company or title..." 
             value={search}
             onChange={e => handleSearchChange(e.target.value)}
-            className="w-full bg-transparent border-b border-border pl-6 pr-4 py-2 text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent transition-colors"
+            className="refined-input"
           />
         </div>
         <button className={toolbarBtnClass}>
@@ -256,50 +254,50 @@ export function Dashboard() {
         </button>
       </div>
 
-      <div className="border border-border overflow-hidden bg-bg-surface surface-card">
-        <table className="w-full text-left border-collapse">
+      <div className="table-wrapper">
+        <table className="refined-table">
           <thead>
-            <tr className="thead-gradient text-thead-text border-b border-border">
-              <th className="p-4 font-mono text-[11px] font-normal uppercase tracking-wider">Company</th>
-              <th className="p-4 font-mono text-[11px] font-normal uppercase tracking-wider">Role</th>
-              <th className="p-4 font-mono text-[11px] font-normal uppercase tracking-wider">Status</th>
-              <th className="p-4 font-mono text-[11px] font-normal uppercase tracking-wider">Lang</th>
-              <th className="p-4 font-mono text-[11px] font-normal uppercase tracking-wider">Date</th>
-              <th className="p-4 font-mono text-[11px] font-normal uppercase tracking-wider text-right">Actions</th>
+            <tr className="table-header">
+              <th className="table-th">Company</th>
+              <th className="table-th">Role</th>
+              <th className="table-th">Status</th>
+              <th className="table-th">Lang</th>
+              <th className="table-th">Date</th>
+              <th className="table-th text-right">Actions</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={6} className="p-8 text-center text-text-muted font-mono text-sm">Loading...</td></tr>
+              <tr><td colSpan={6} className="table-cell-loading">Loading...</td></tr>
             ) : apps.length === 0 ? (
               <tr><td colSpan={6}><EmptyState message={search ? 'No applications match your search.' : 'No applications found.'} /></td></tr>
             ) : apps.map(app => (
               <tr 
                 key={app.id} 
                 onClick={() => navigate(`/applications/${app.id}`)}
-                className={`border-b border-border hover:bg-bg-elevated transition-colors cursor-pointer group ${
+                className={`table-row clickable ${
                   highlightedId === app.id ? 'flash-highlight' : ''
                 }`}
               >
-                <td className="p-4 font-medium text-text-primary">
+                <td className="table-cell font-medium">
                   {app.companyName}
                 </td>
-                <td className="p-4 text-text-primary">{app.jobTitle}</td>
-                <td className="p-4">
+                <td className="table-cell">{app.jobTitle}</td>
+                <td className="table-cell">
                   <StatusBadge status={app.status} />
                 </td>
-                <td className="p-4 text-text-secondary font-mono text-sm">{app.targetLanguage}</td>
-                <td className="p-4 text-text-secondary font-mono text-sm whitespace-nowrap">
+                <td className="table-cell-mono">{app.targetLanguage}</td>
+                <td className="table-cell-mono whitespace-nowrap">
                   {format(new Date(app.createdAt), 'dd.MM.yyyy')}
                 </td>
-                <td className="p-4 text-right whitespace-nowrap space-x-2 opacity-0 group-hover:opacity-100 transition-opacity" onClick={e => e.stopPropagation()}>
-                  <a href={`/api/applications/${app.id}/download/tex`} className="inline-flex p-2 text-text-muted hover:text-accent transition-colors" title="Download TEX">
+                <td className="table-cell-actions" onClick={e => e.stopPropagation()}>
+                  <a href={`/api/applications/${app.id}/download/tex`} className="icon-action" title="Download TEX">
                     <FileText size={16} />
                   </a>
-                  <a href={`/api/applications/${app.id}/download/pdf`} className="inline-flex p-2 text-text-muted hover:text-accent transition-colors" title="Download PDF">
+                  <a href={`/api/applications/${app.id}/download/pdf`} className="icon-action" title="Download PDF">
                     <Download size={16} />
                   </a>
-                  <button onClick={() => handleDelete(app.id)} className="inline-flex p-2 text-text-muted hover:text-destructive transition-colors" title="Delete">
+                  <button onClick={() => handleDelete(app.id)} className="icon-action-destructive" title="Delete">
                     <Trash2 size={16} />
                   </button>
                 </td>
@@ -329,16 +327,16 @@ export function Dashboard() {
 
 function StatusBadge({ status }: { status: string }) {
   const styles: Record<string, string> = {
-    GENERATED: 'bg-status-generated/10 text-status-generated',
-    APPLIED: 'bg-status-applied/10 text-status-applied',
-    INTERVIEW: 'bg-status-interview/10 text-status-interview',
-    OFFER: 'bg-status-offer/10 text-status-offer',
-    REJECTED: 'bg-status-rejected/10 text-status-rejected',
-    WITHDRAWN: 'bg-status-withdrawn/10 text-status-withdrawn',
+    GENERATED: 'badge-generate',
+    APPLIED: 'badge-apply',
+    INTERVIEW: 'badge-interview',
+    OFFER: 'badge-offer',
+    REJECTED: 'badge-reject',
+    WITHDRAWN: 'badge-withdrawn',
   };
 
   return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded-sm font-mono text-[10px] uppercase tracking-wider ${styles[status] || styles.GENERATED}`}>
+    <span className={`badge ${styles[status] || styles.GENERATED}`}>
       {status}
     </span>
   );

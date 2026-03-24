@@ -12,10 +12,10 @@ export function Layout() {
   }, [location.pathname]);
 
   const navLinkClass = ({ isActive }: { isActive: boolean }) =>
-    `flex items-center gap-3 px-3 py-2 transition-colors text-[13px] ${
+    `flex items-center gap-2.5 px-3 py-2.5 rounded-md text-[13px] font-medium transition-all duration-150 ${
       isActive
-        ? 'text-sidebar-text-active border-l-2 border-accent -ml-px'
-        : 'text-sidebar-text hover:text-sidebar-heading'
+        ? 'bg-sidebar-text-active/10 text-sidebar-text-active border-l-2 border-accent -ml-px'
+        : 'text-sidebar-text hover:text-sidebar-heading hover:bg-sidebar-text-active/5'
     }`;
 
   return (

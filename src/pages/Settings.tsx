@@ -187,33 +187,33 @@ export function Settings() {
 
   if (loading) return <div className="p-8 text-text-secondary font-mono text-sm">Loading...</div>;
 
-  const editorTextareaClass = "w-full bg-bg-base border border-border p-4 text-text-primary focus:outline-none focus:border-accent transition-colors font-mono text-sm whitespace-pre-wrap resize-y leading-relaxed inset-surface";
+  const editorTextareaClass = "input-refined font-mono text-sm whitespace-pre-wrap resize-y leading-relaxed min-h-[300px]";
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
-      <div className="flex justify-between items-end pb-6 border-b border-border">
+    <div className="max-w-4xl mx-auto space-y-8">
+      <div className="page-header">
         <div>
-          <h1 className="text-[2.5rem] font-serif text-text-primary tracking-tight leading-tight">Context & Settings</h1>
-          <p className="text-text-secondary mt-1">Manage your master CV and generation rules</p>
+          <h1 className="page-title">Context & Settings</h1>
+          <p className="page-subtitle">Manage your master CV and generation rules</p>
         </div>
         <button
           onClick={handleSave}
           disabled={saving}
-          className="flex items-center gap-2 bg-accent hover:bg-accent-hover text-text-on-accent font-medium px-6 py-2.5 transition-colors disabled:opacity-50"
+          className="btn-primary"
         >
           {saving ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
           {saving ? 'Saving...' : 'Save Changes'}
         </button>
       </div>
 
-      <div className="flex gap-4 border-b border-border">
+      <div className="flex gap-1 border-b border-border">
         {SETTINGS_TABS.map(tab => (
           <button
             key={tab.key}
             onClick={() => setActiveSection(tab.key)}
-            className={`pb-2 text-sm transition-colors ${
+            className={`px-4 py-2 text-sm font-mono uppercase tracking-wider transition-colors ${
               activeSection === tab.key
-                ? 'text-text-primary border-b-2 border-accent'
+                ? 'text-text-primary border-b-2 border-accent -mb-px'
                 : 'text-text-secondary hover:text-text-primary'
             }`}
           >
@@ -224,15 +224,15 @@ export function Settings() {
 
       <div className="space-y-8">
         {/* Master CV */}
-        <section className={`bg-bg-surface border border-border p-8 space-y-4 surface-card${activeSection !== 'master-cv' ? ' hidden' : ''}`}>
-          <h2 className="font-mono text-[11px] uppercase tracking-wider text-text-secondary">Master CV (LaTeX)</h2>
+        <section className={`table-wrapper p-8 space-y-4${activeSection !== 'master-cv' ? ' hidden' : ''}`}>
+          <h2 className="form-label">Master CV (LaTeX)</h2>
           <p className="text-sm text-text-secondary">The base LaTeX template and content to draw from.</p>
           <textarea rows={15} value={context['master-cv.tex']} onChange={e => setContext({...context, 'master-cv.tex': e.target.value})} className={editorTextareaClass} spellCheck={false} />
         </section>
 
         {/* Profile Picture */}
-        <section className={`bg-bg-surface border border-border p-8 space-y-4 surface-card${activeSection !== 'profile-picture' ? ' hidden' : ''}`}>
-          <h2 className="font-mono text-[11px] uppercase tracking-wider text-text-secondary">Profile Picture</h2>
+        <section className={`table-wrapper p-8 space-y-4${activeSection !== 'profile-picture' ? ' hidden' : ''}`}>
+          <h2 className="form-label">Profile Picture</h2>
           <p className="text-sm text-text-secondary">Upload your profile picture to use in your CV.</p>
           <div className="flex items-start gap-6">
             <div className="shrink-0">
@@ -264,10 +264,10 @@ export function Settings() {
         </section>
 
         {/* Certificates */}
-        <section className={`bg-bg-surface border border-border p-8 space-y-4 surface-card${activeSection !== 'certificates' ? ' hidden' : ''}`}>
+        <section className={`table-wrapper p-8 space-y-4${activeSection !== 'certificates' ? ' hidden' : ''}`}>
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="font-mono text-[11px] uppercase tracking-wider text-text-secondary">Certificates & Qualifications</h2>
+              <h2 className="form-label">Certificates & Qualifications</h2>
               <p className="text-sm text-text-secondary mt-1">Manage your certificates, courses, and qualifications.</p>
             </div>
             {savedCerts.length > 0 && (

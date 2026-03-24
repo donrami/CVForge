@@ -260,8 +260,8 @@ export function NewApplication() {
     }
   };
 
-  const labelClass = "block font-mono text-[11px] uppercase tracking-wider text-text-secondary mb-2";
-  const inputClass = "w-full bg-bg-base border border-border px-4 py-3 text-text-primary focus:outline-none focus:border-accent transition-colors inset-surface";
+  const labelClass = "form-label";
+  const inputClass = "input-refined";
 
   const isGenerating = generationState.status === 'started' || generationState.status === 'polling';
   const isComplete = generationState.status === 'complete';
@@ -269,14 +269,14 @@ export function NewApplication() {
 
   return (
     <div className="max-w-2xl mx-auto space-y-8">
-      <div className="pb-6 border-b border-border">
-        <h1 className="text-[2.5rem] font-serif text-text-primary tracking-tight leading-tight">New Application</h1>
-        <p className="text-text-secondary mt-1">Generate a tailored CV for a specific job description</p>
+      <div className="page-header">
+        <h1 className="page-title">New Application</h1>
+        <p className="page-subtitle">Generate a tailored CV for a specific job description</p>
       </div>
 
       {isGenerating && !isComplete && !hasError && (
-        <div className="bg-bg-surface border border-border overflow-hidden surface-card">
-          <div className="px-8 pt-8 pb-6 space-y-6">
+        <div className="table-wrapper">
+          <div className="p-8 space-y-6">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
               <StatusIcon status={generationState.status} />
@@ -339,7 +339,7 @@ export function NewApplication() {
             <div className="pt-4 border-t border-border flex justify-end">
               <button
                 onClick={handleCancel}
-                className="flex items-center gap-2 px-4 py-2 text-text-muted hover:text-text-secondary font-mono text-xs uppercase tracking-wider transition-colors"
+                className="btn-ghost"
               >
                 Cancel
               </button>
@@ -388,7 +388,7 @@ export function NewApplication() {
       )}
 
       {!isGenerating && !isComplete && (
-        <form onSubmit={handleSubmit} className="space-y-6 bg-bg-surface border border-border p-8 surface-card">
+        <form onSubmit={handleSubmit} className="table-wrapper space-y-6 p-8">
           <div className="grid grid-cols-2 gap-6">
             <div>
               <label className={labelClass}>Company Name</label>
@@ -432,10 +432,10 @@ export function NewApplication() {
                   key={lang}
                   type="button"
                   onClick={() => setFormData({...formData, targetLanguage: lang})}
-                  className={`px-4 py-2 font-mono text-sm border transition-colors ${
+                  className={`px-4 py-2 font-mono text-sm border transition-all ${
                     formData.targetLanguage === lang
-                      ? 'bg-accent text-text-on-accent border-accent'
-                      : 'bg-transparent text-text-secondary border-border hover:text-text-primary'
+                      ? 'bg-accent text-text-on-accent border-accent rounded-md'
+                      : 'bg-transparent text-text-secondary border-border hover:text-text-primary rounded-md'
                   }`}
                 >
                   {lang}
@@ -460,7 +460,7 @@ export function NewApplication() {
               type="button"
               onClick={handleLoadLast}
               disabled={loadingLast}
-              className="flex items-center gap-2 px-5 py-2.5 border border-border text-text-secondary font-mono text-xs uppercase tracking-wider hover:text-text-primary transition-colors disabled:opacity-40"
+              className="btn-ghost rounded-md"
             >
               {loadingLast ? <Loader2 className="animate-spin" size={16} /> : <RotateCcw size={16} />}
               Load Last
@@ -468,7 +468,7 @@ export function NewApplication() {
             <button 
               type="submit"
               disabled={isCheckingDuplicate}
-              className="flex items-center gap-2 bg-accent hover:bg-accent-hover text-text-on-accent font-medium px-6 py-2.5 transition-colors disabled:opacity-60"
+              className="btn-primary"
             >
               {isCheckingDuplicate ? (
                 <>

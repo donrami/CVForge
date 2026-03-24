@@ -1,7 +1,8 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { FileText, Download, ArrowLeft, Save, Check } from 'lucide-react';
+import { FileText, Download, ArrowLeft, Save, Check, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
+import { useDialog } from '../context/DialogContext';
 
 interface Application {
   id: string;
@@ -23,8 +24,9 @@ interface Application {
 const STATUSES = ['GENERATED', 'APPLIED', 'INTERVIEW', 'OFFER', 'REJECTED', 'WITHDRAWN'];
 
 export function ApplicationDetail() {
-  const { id } = useParams();
+  const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { confirm, toast } = useDialog();
   const [app, setApp] = useState<Application | null>(null);
   const [notes, setNotes] = useState('');
   const [status, setStatus] = useState('');
@@ -109,6 +111,28 @@ export function ApplicationDetail() {
     }
   };
 
+  const handleDelete = async () => {
+    const confirmed = await confirm({
+      title: 'Delete Application',
+      message: 'Are you sure you want to delete this application? This action cannot be undone.',
+      confirmText: 'Delete',
+      cancelText: 'Cancel',
+      severity: 'destructive',
+    });
+    if (!confirmed) return;
+    try {
+      const response = await fetch(`/api/applications/${id}`, { method: 'DELETE' });
+      if (response.ok) {
+        toast('Application deleted successfully', 'success');
+        navigate('/');
+      } else {
+        toast('Failed to delete application', 'error');
+      }
+    } catch {
+      toast('Failed to delete application', 'error');
+    }
+  };
+
   if (!app) return <div className="p-8 text-text-secondary font-mono text-sm">Loading...</div>;
 
   let rawLog: any = null;
@@ -121,7 +145,7 @@ export function ApplicationDetail() {
   const isLegacy = Array.isArray(rawLog);
 
   return (
-    <div className="space-y-6 max-w-5xl mx-auto">
+    <div className="space-y-8 max-w-5xl mx-auto">
       <div className="flex items-center gap-4 text-text-secondary mb-4">
         <Link to="/" className="hover:text-accent transition-colors flex items-center gap-1 text-sm">
           <ArrowLeft size={16} /> Back
@@ -136,22 +160,22 @@ export function ApplicationDetail() {
         )}
       </div>
 
-      <div className="flex justify-between items-start border-b border-border pb-4">
+      <div className="page-header">
         <div>
-          <h1 className="text-[2.5rem] font-serif text-text-primary tracking-tight leading-tight">{app.companyName}</h1>
-          <p className="text-xl text-text-secondary mt-1">{app.jobTitle}</p>
+          <h1 className="page-title">{app.companyName}</h1>
+          <p className="page-subtitle text-xl">{app.jobTitle}</p>
         </div>
         <div className="flex gap-3 items-center">
           <a
             href={`/api/applications/${app.id}/download/tex`}
-            className="flex items-center gap-2 px-4 py-2 border border-border text-text-secondary font-mono text-xs uppercase tracking-wider hover:text-text-primary transition-colors"
+            className="btn-ghost"
           >
             <FileText size={16} />
             .tex
           </a>
           <a
             href={`/api/applications/${app.id}/download/pdf`}
-            className="flex items-center gap-2 bg-accent hover:bg-accent-hover text-text-on-accent font-mono text-xs uppercase tracking-wider px-4 py-2 transition-colors"
+            className="btn-primary"
           >
             <Download size={16} />
             PDF
@@ -159,25 +183,33 @@ export function ApplicationDetail() {
           <button
             onClick={handleSave}
             disabled={!isDirty || saving}
-            className="flex items-center gap-2 bg-accent hover:bg-accent-hover text-text-on-accent font-medium px-6 py-2.5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="btn-primary"
           >
             <Save size={16} />
             {saving ? 'Saving...' : 'Save Changes'}
+          </button>
+          <button
+            onClick={handleDelete}
+            className="btn-ghost hover:text-destructive hover:border-destructive"
+            title="Delete"
+          >
+            <Trash2 size={16} />
+            Delete
           </button>
         </div>
       </div>
 
       <div className="grid grid-cols-3 gap-8">
         <div className="col-span-2 space-y-8">
-          <section className="bg-bg-surface border border-border p-6 space-y-4 surface-card">
-            <h2 className="font-mono text-[11px] uppercase tracking-wider text-text-secondary">Job Description</h2>
+          <section className="table-wrapper p-6 space-y-4">
+            <h2 className="form-label">Job Description</h2>
             <div className="text-text-primary text-sm whitespace-pre-wrap leading-relaxed">
               {app.jobDescription}
             </div>
           </section>
 
-          <section className="bg-bg-surface border border-border p-6 space-y-4 surface-card">
-            <h2 className="font-mono text-[11px] uppercase tracking-wider text-text-secondary">Generation Log</h2>
+          <section className="table-wrapper p-6 space-y-4">
+            <h2 className="form-label">Generation Log</h2>
             {logParseError ? (
               <p className="text-sm text-text-muted italic">Log unavailable</p>
             ) : isLegacy ? (
@@ -272,14 +304,13 @@ export function ApplicationDetail() {
                       onChange={e => setLatexSource(e.target.value)}
                       rows={20}
                       spellCheck={false}
-                      wrap="off"
                       className="w-full bg-bg-base border border-border px-4 py-3 text-text-primary focus:outline-none focus:border-accent transition-colors resize-y font-mono text-sm leading-relaxed inset-surface"
                     />
                     <div className="flex items-center gap-3">
                       <button
                         onClick={handleLatexSave}
                         disabled={!isDirty || saveStatus === 'saving'}
-                        className="flex items-center gap-2 bg-accent hover:bg-accent-hover text-text-on-accent font-mono text-xs uppercase tracking-wider px-4 py-2 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                        className="flex items-center gap-2 bg-accent hover:bg-accent-hover text-text-on-accent font-mono text-xs uppercase tracking-wider px-4 py-2 transition-colors disabled:opacity-40 disabled:cursor-not-allowed rounded-md"
                       >
                         <Save size={14} />
                         {saveStatus === 'saving' ? 'Saving...' : 'Save'}

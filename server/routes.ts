@@ -311,20 +311,32 @@ apiRouter.patch('/applications/:id', requireAuth, async (req, res) => {
 
 apiRouter.delete('/applications/:id', requireAuth, async (req, res) => {
   try {
+    // First delete the generated folder from disk
+    const app = await prisma.application.findUnique({ where: { id: req.params.id } });
+    if (app) {
+      const genDir = getGenDir(app);
+      try {
+        await fs.rm(genDir, { recursive: true, force: true });
+        console.log(`Deleted generated folder: ${genDir}`);
+      } catch (folderError) {
+        console.error(`Failed to delete generated folder: ${genDir}`, folderError);
+        return res.status(500).json({
+          success: false,
+          error: 'FOLDER_DELETE_ERROR',
+          message: 'Failed to delete generated files',
+        });
+      }
+    }
+
+    // Then update the database
     await prisma.application.update({
       where: { id: req.params.id },
       data: { deletedAt: new Date() }
     });
 
-    // Remove generated files from disk
-    const app = await prisma.application.findUnique({ where: { id: req.params.id } });
-    if (app) {
-      const genDir = getGenDir(app);
-      await fs.rm(genDir, { recursive: true, force: true });
-    }
-
     res.json({ success: true });
   } catch (e) {
+    console.error('Database error during delete:', e);
     errorResponse(res, 500, e, 'DATABASE_ERROR');
   }
 });
