@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
-import { FileText, Plus, Search, Filter, Download, RefreshCw, Trash2, Loader2 } from 'lucide-react';
+import { FileText, Plus, Search, Filter, Download, RefreshCw, Loader2, BarChart2, CheckCircle2, XCircle, Clock, RefreshCcw, FileEdit } from 'lucide-react';
 import { format } from 'date-fns';
 import { useDialog } from '../context/DialogContext';
 import { EmptyState } from '../components/EmptyState';
 import { PaginationControls } from '../components/PaginationControls';
 import { RestoreConfirmationDialog } from '../components/dialogs/RestoreConfirmationDialog';
+import { fetchActiveJobs, JobInfo } from '../hooks/useJobStatus';
 
 interface Application {
   id: string;
@@ -17,9 +18,18 @@ interface Application {
   pdfGenerated: boolean;
 }
 
+interface DashboardStats {
+  total: number;
+  inProgress: number;
+  active: number;
+  outcomes: number;
+}
+
 export function Dashboard() {
   const navigate = useNavigate();
   const [apps, setApps] = useState<Application[]>([]);
+  const [activeJobs, setActiveJobs] = useState<JobInfo[]>([]);
+  const [stats, setStats] = useState<DashboardStats>({ total: 0, inProgress: 0, active: 0, outcomes: 0 });
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [backupLoading, setBackupLoading] = useState(false);
@@ -38,20 +48,30 @@ export function Dashboard() {
   useEffect(() => {
     const skip = (currentPage - 1) * pageSize;
     const searchParam = search.trim() ? `&search=${encodeURIComponent(search.trim())}` : '';
-    fetch(`/api/applications?skip=${skip}&take=${pageSize}${searchParam}`)
-      .then(res => {
+
+    Promise.all([
+      fetch(`/api/applications?skip=${skip}&take=${pageSize}${searchParam}`).then(res => {
         if (!res.ok) throw new Error('Failed to fetch applications');
         return res.json();
-      })
-      .then(data => {
-        setApps(data.applications || []);
-        setTotal(data.total ?? 0);
-        setLoading(false);
-      })
-      .catch(() => {
-        toast('Failed to load applications', 'error');
-        setLoading(false);
-      });
+      }),
+      fetchActiveJobs().catch(() => [])
+    ])
+    .then(([appData, jobs]) => {
+      setApps(appData.applications || []);
+      setTotal(appData.total ?? 0);
+      setActiveJobs(jobs as JobInfo[]);
+      if (appData.stats) {
+        setStats({
+          ...appData.stats,
+          inProgress: (appData.stats.inProgress || 0) + (jobs?.length || 0)
+        });
+      }
+      setLoading(false);
+    })
+    .catch(() => {
+      toast('Failed to load dashboard data', 'error');
+      setLoading(false);
+    });
   }, [currentPage, pageSize, search]);
 
   useEffect(() => {
@@ -124,31 +144,6 @@ export function Dashboard() {
     setCurrentPage(1);
   };
 
-  const handleDelete = async (id: string) => {
-    const confirmed = await confirm({
-      title: 'Delete Application',
-      message: 'Are you sure you want to delete this application? This action cannot be undone.',
-      confirmText: 'Delete',
-      cancelText: 'Cancel',
-      severity: 'destructive',
-    });
-
-    if (confirmed) {
-      try {
-        const response = await fetch(`/api/applications/${id}`, { method: 'DELETE' });
-        if (response.ok) {
-          setApps(apps.filter(app => app.id !== id));
-          setTotal(prev => Math.max(0, prev - 1));
-          toast('Application deleted successfully', 'success');
-        } else {
-          toast('Failed to delete application', 'error');
-        }
-      } catch {
-        toast('Failed to delete application', 'error');
-      }
-    }
-  };
-
   const handleRestoreClick = () => {
     const input = document.createElement('input');
     input.type = 'file';
@@ -213,18 +208,49 @@ export function Dashboard() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-end pb-6 border-b border-border">
+      <div className="flex justify-between items-end pb-6">
         <div>
-          <h1 className="text-[2.5rem] font-serif text-text-primary tracking-tight leading-tight">Applications</h1>
-          <p className="text-text-secondary mt-1">Track and manage your generated CVs</p>
+          <h1 className="text-[2.5rem] font-serif text-text-primary tracking-tight leading-tight">Dashboard</h1>
+          <p className="text-text-secondary mt-1">Manage your job applications</p>
         </div>
         <Link 
           to="/new" 
-          className="flex items-center gap-2 bg-accent hover:bg-accent-hover text-text-on-accent font-medium px-4 py-2 transition-colors"
+          className="flex items-center gap-2 bg-accent hover:bg-accent-hover text-text-on-accent font-medium px-6 py-3 rounded-sm transition-colors shadow-sm"
         >
           <Plus size={18} />
           New Application
         </Link>
+      </div>
+
+      <div className="grid grid-cols-4 gap-4 mb-6">
+        <div className="bg-bg-surface border border-border p-4 flex flex-col surface-card">
+          <div className="flex items-center gap-2 text-text-secondary mb-2">
+            <BarChart2 size={16} />
+            <span className="font-mono text-[11px] uppercase tracking-wider">Total</span>
+          </div>
+          <span className="text-3xl font-serif text-text-primary">{stats.total}</span>
+        </div>
+        <div className="bg-bg-surface border border-border p-4 flex flex-col surface-card">
+          <div className="flex items-center gap-2 text-status-generating mb-2">
+            <Clock size={16} />
+            <span className="font-mono text-[11px] uppercase tracking-wider">In Progress</span>
+          </div>
+          <span className="text-3xl font-serif text-text-primary">{stats.inProgress}</span>
+        </div>
+        <div className="bg-bg-surface border border-border p-4 flex flex-col surface-card">
+          <div className="flex items-center gap-2 text-status-applied mb-2">
+            <CheckCircle2 size={16} />
+            <span className="font-mono text-[11px] uppercase tracking-wider">Active</span>
+          </div>
+          <span className="text-3xl font-serif text-text-primary">{stats.active}</span>
+        </div>
+        <div className="bg-bg-surface border border-border p-4 flex flex-col surface-card">
+          <div className="flex items-center gap-2 text-status-offer mb-2">
+            <XCircle size={16} />
+            <span className="font-mono text-[11px] uppercase tracking-wider">Outcomes</span>
+          </div>
+          <span className="text-3xl font-serif text-text-primary">{stats.outcomes}</span>
+        </div>
       </div>
 
       <div className="flex gap-3 items-center">
@@ -271,40 +297,66 @@ export function Dashboard() {
           <tbody>
             {loading ? (
               <tr><td colSpan={6} className="p-8 text-center text-text-muted font-mono text-sm">Loading...</td></tr>
-            ) : apps.length === 0 ? (
+            ) : apps.length === 0 && activeJobs.length === 0 ? (
               <tr><td colSpan={6}><EmptyState message={search ? 'No applications match your search.' : 'No applications found.'} /></td></tr>
-            ) : apps.map(app => (
-              <tr 
-                key={app.id} 
-                onClick={() => navigate(`/applications/${app.id}`)}
-                className={`border-b border-border hover:bg-bg-elevated transition-colors cursor-pointer group ${
-                  highlightedId === app.id ? 'flash-highlight' : ''
-                }`}
-              >
-                <td className="p-4 font-medium text-text-primary">
-                  {app.companyName}
-                </td>
-                <td className="p-4 text-text-primary">{app.jobTitle}</td>
-                <td className="p-4">
-                  <StatusBadge status={app.status} />
-                </td>
-                <td className="p-4 text-text-secondary font-mono text-sm">{app.targetLanguage}</td>
-                <td className="p-4 text-text-secondary font-mono text-sm whitespace-nowrap">
-                  {format(new Date(app.createdAt), 'dd.MM.yyyy')}
-                </td>
-                <td className="p-4 text-right whitespace-nowrap space-x-2 opacity-0 group-hover:opacity-100 transition-opacity" onClick={e => e.stopPropagation()}>
-                  <a href={`/api/applications/${app.id}/download/tex`} className="inline-flex p-2 text-text-muted hover:text-accent transition-colors" title="Download TEX">
-                    <FileText size={16} />
-                  </a>
-                  <a href={`/api/applications/${app.id}/download/pdf`} className="inline-flex p-2 text-text-muted hover:text-accent transition-colors" title="Download PDF">
-                    <Download size={16} />
-                  </a>
-                  <button onClick={() => handleDelete(app.id)} className="inline-flex p-2 text-text-muted hover:text-destructive transition-colors" title="Delete">
-                    <Trash2 size={16} />
-                  </button>
-                </td>
-              </tr>
-            ))}
+            ) : (
+              <>
+                {currentPage === 1 && activeJobs.map(job => (
+                  <tr
+                    key={job.id}
+                    className="border-b border-border bg-bg-elevated/50 transition-colors"
+                  >
+                    <td className="p-4 font-medium text-text-primary opacity-70">
+                      {job.companyName || 'Unknown Company'}
+                    </td>
+                    <td className="p-4 text-text-primary opacity-70">{job.jobTitle || 'New Application'}</td>
+                    <td className="p-4">
+                      <span className="inline-flex items-center gap-2 bg-status-generating/10 text-status-generating px-2 py-0.5 rounded-sm font-mono text-[10px] uppercase tracking-wider">
+                        <Loader2 size={10} className="animate-spin" /> GENERATING
+                      </span>
+                    </td>
+                    <td className="p-4 text-text-secondary font-mono text-sm opacity-70">-</td>
+                    <td className="p-4 text-text-secondary font-mono text-sm whitespace-nowrap opacity-70">
+                      Just now
+                    </td>
+                    <td className="p-4 text-right whitespace-nowrap space-x-2">
+                    </td>
+                  </tr>
+                ))}
+                {apps.map(app => (
+                  <tr
+                    key={app.id}
+                    onClick={() => navigate(`/applications/${app.id}`)}
+                    className={`border-b border-border hover:bg-bg-elevated transition-colors cursor-pointer group ${
+                      highlightedId === app.id ? 'flash-highlight' : ''
+                    }`}
+                  >
+                    <td className="p-4 font-medium text-text-primary">
+                      {app.companyName}
+                    </td>
+                    <td className="p-4 text-text-primary">{app.jobTitle}</td>
+                    <td className="p-4">
+                      <StatusBadge status={app.status} />
+                    </td>
+                    <td className="p-4 text-text-secondary font-mono text-sm">{app.targetLanguage}</td>
+                    <td className="p-4 text-text-secondary font-mono text-sm whitespace-nowrap">
+                      {format(new Date(app.createdAt), 'dd.MM.yyyy')}
+                    </td>
+                    <td className="p-4 text-right whitespace-nowrap space-x-1 opacity-0 group-hover:opacity-100 transition-opacity" onClick={e => e.stopPropagation()}>
+                      <button onClick={() => navigate(`/applications/${app.id}`)} className="inline-flex p-2 text-text-muted hover:text-accent transition-colors" title="Notes">
+                        <FileEdit size={16} />
+                      </button>
+                      <button onClick={() => navigate(`/new?regenerate=${app.id}`)} className="inline-flex p-2 text-text-muted hover:text-accent transition-colors" title="Regenerate">
+                        <RefreshCcw size={16} />
+                      </button>
+                      <a href={`/api/applications/${app.id}/download/pdf`} className="inline-flex p-2 text-text-muted hover:text-accent transition-colors" title="View PDF">
+                        <Download size={16} />
+                      </a>
+                    </td>
+                  </tr>
+                ))}
+              </>
+            )}
           </tbody>
         </table>
       </div>

@@ -2,82 +2,84 @@
 
 /* ─── Light mode (default) ─── */
 :root {
-  --cv-bg-base:        #f5f3ef;
+  --cv-bg-base:        #f4f5f7;
   --cv-bg-surface:     #ffffff;
-  --cv-bg-elevated:    #edeae4;
-  --cv-border:         #d6d1c7;
+  --cv-bg-elevated:    #eaedf1;
+  --cv-border:         #dfe2e8;
   --cv-overlay:        rgba(0, 0, 0, 0.4);
 
-  --cv-text-primary:   #1a1917;
-  --cv-text-secondary: #6b6358;
-  --cv-text-muted:     #a09888;
+  --cv-text-primary:   #111827;
+  --cv-text-secondary: #4b5563;
+  --cv-text-muted:     #9ca3af;
   --cv-text-on-accent: #ffffff;
 
-  --cv-accent:         #0d9488;
-  --cv-accent-hover:   #0f766e;
-  --cv-accent-subtle:  #0d9488;
+  --cv-accent:         #4f46e5;
+  --cv-accent-hover:   #4338ca;
+  --cv-accent-subtle:  #4f46e5;
 
-  --cv-success:        #4a7c59;
-  --cv-success-subtle: rgba(74, 124, 89, 0.1);
-  --cv-warning:        #9a8340;
-  --cv-destructive:    #a04a3a;
-  --cv-destructive-subtle: rgba(160, 74, 58, 0.08);
+  --cv-success:        #059669;
+  --cv-success-subtle: rgba(5, 150, 105, 0.1);
+  --cv-warning:        #d97706;
+  --cv-destructive:    #dc2626;
+  --cv-destructive-subtle: rgba(220, 38, 38, 0.08);
 
-  --cv-status-generated: #0d9488;
-  --cv-status-applied:   #5a7a8f;
-  --cv-status-interview: #4a7f6f;
-  --cv-status-offer:     #4a7c59;
-  --cv-status-rejected:  #a04a3a;
-  --cv-status-withdrawn: #8a8070;
+  --cv-status-generating: #f59e0b;
+  --cv-status-generated: #4f46e5;
+  --cv-status-applied:   #0ea5e9;
+  --cv-status-interview: #8b5cf6;
+  --cv-status-offer:     #10b981;
+  --cv-status-rejected:  #ef4444;
+  --cv-status-withdrawn: #6b7280;
 
-  --cv-sidebar-bg:       #1a1917;
-  --cv-sidebar-border:   #2e2c28;
-  --cv-sidebar-text:     #8a8070;
-  --cv-sidebar-text-active: #f0ede8;
-  --cv-sidebar-heading:  #f0ede8;
+  --cv-sidebar-bg:       #1f2937;
+  --cv-sidebar-border:   #374151;
+  --cv-sidebar-text:     #9ca3af;
+  --cv-sidebar-text-active: #f9fafb;
+  --cv-sidebar-heading:  #f9fafb;
 
-  --cv-thead-bg:         #edeae4;
-  --cv-thead-text:       #6b6358;
+  --cv-thead-bg:         #f9fafb;
+  --cv-thead-text:       #6b7280;
 }
 
 /* ─── Dark mode ─── */
 .dark {
-  --cv-bg-base:        #161514;
-  --cv-bg-surface:     #1c1b19;
-  --cv-bg-elevated:    #232220;
-  --cv-border:         #302e29;
+  --cv-bg-base:        #0f1115;
+  --cv-bg-surface:     #16181d;
+  --cv-bg-elevated:    #1e2128;
+  --cv-border:         #2d323b;
   --cv-overlay:        rgba(0, 0, 0, 0.7);
 
-  --cv-text-primary:   #f0ede8;
-  --cv-text-secondary: #8a8070;
-  --cv-text-muted:     #5a5347;
-  --cv-text-on-accent: #0f0e0d;
+  --cv-text-primary:   #f3f4f6;
+  --cv-text-secondary: #9ca3af;
+  --cv-text-muted:     #6b7280;
+  --cv-text-on-accent: #ffffff;
 
-  --cv-accent:         #2dd4bf;
-  --cv-accent-hover:   #5eead4;
-  --cv-accent-subtle:  #2dd4bf;
+  --cv-accent:         #6366f1;
+  --cv-accent-hover:   #818cf8;
+  --cv-accent-subtle:  #6366f1;
 
-  --cv-success:        #6b8f71;
-  --cv-success-subtle: rgba(107, 143, 113, 0.12);
-  --cv-warning:        #b8a36e;
-  --cv-destructive:    #a05a4a;
-  --cv-destructive-subtle: rgba(160, 90, 74, 0.1);
+  --cv-success:        #10b981;
+  --cv-success-subtle: rgba(16, 185, 129, 0.12);
+  --cv-warning:        #f59e0b;
+  --cv-destructive:    #ef4444;
+  --cv-destructive-subtle: rgba(239, 68, 68, 0.1);
 
-  --cv-status-generated: #2dd4bf;
-  --cv-status-applied:   #7a8fa0;
-  --cv-status-interview: #6b9a8a;
-  --cv-status-offer:     #6b8f71;
-  --cv-status-rejected:  #a05a4a;
-  --cv-status-withdrawn: #5a5347;
+  --cv-status-generating: #f59e0b;
+  --cv-status-generated: #6366f1;
+  --cv-status-applied:   #38bdf8;
+  --cv-status-interview: #a78bfa;
+  --cv-status-offer:     #34d399;
+  --cv-status-rejected:  #f87171;
+  --cv-status-withdrawn: #9ca3af;
 
-  --cv-sidebar-bg:       #111110;
-  --cv-sidebar-border:   #1e1c19;
-  --cv-sidebar-text:     #8a8070;
-  --cv-sidebar-text-active: #f0ede8;
-  --cv-sidebar-heading:  #f0ede8;
+  --cv-sidebar-bg:       #0b0d10;
+  --cv-sidebar-border:   #1f232b;
+  --cv-sidebar-text:     #9ca3af;
+  --cv-sidebar-text-active: #f3f4f6;
+  --cv-sidebar-heading:  #f3f4f6;
 
-  --cv-thead-bg:         #1a1918;
-  --cv-thead-text:       #8a8070;
+  --cv-thead-bg:         #16181d;
+  --cv-thead-text:       #9ca3af;
 }
 
 @theme {
@@ -107,6 +109,7 @@
   --color-destructive-subtle: var(--cv-destructive-subtle);
 
   /* ─── Semantic: status ─── */
+  --color-status-generating: var(--cv-status-generating);
   --color-status-generated: var(--cv-status-generated);
   --color-status-applied:   var(--cv-status-applied);
   --color-status-interview: var(--cv-status-interview);

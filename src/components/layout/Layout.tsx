@@ -1,5 +1,5 @@
 import { Outlet, NavLink, useLocation } from 'react-router-dom';
-import { FileText, Plus, Settings } from 'lucide-react';
+import { FileText, Plus, Settings, MessageSquare } from 'lucide-react';
 import { ThemeToggle } from '../ThemeToggle';
 import { useEffect, useState } from 'react';
 
@@ -29,17 +29,22 @@ export function Layout() {
         </div>
         
         <nav className="flex-1 p-4 space-y-1">
-          <NavLink to="/new" className={navLinkClass}>
-            <Plus size={16} />
-            <span>New CV</span>
-          </NavLink>
           <NavLink to="/" end className={navLinkClass}>
             <FileText size={16} />
-            <span>Applications</span>
+            <span>Dashboard</span>
+          </NavLink>
+          <NavLink to="/new" className={navLinkClass}>
+            <Plus size={16} />
+            <span>New Application</span>
           </NavLink>
           <NavLink to="/settings" className={navLinkClass}>
             <Settings size={16} />
             <span>Settings</span>
+          </NavLink>
+          {/* Chat Assistant is currently unrouted, placeholder */}
+          <NavLink to="/chat" className={navLinkClass}>
+            <MessageSquare size={16} />
+            <span>Chat Assistant</span>
           </NavLink>
         </nav>
 

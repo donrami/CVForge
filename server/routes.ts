@@ -152,7 +152,7 @@ apiRouter.get('/applications', requireAuth, async (req, res) => {
       ];
     }
 
-    const [applications, total] = await Promise.all([
+    const [applications, total, inProgress, active, outcomes] = await Promise.all([
       prisma.application.findMany({
         where,
         orderBy: { createdAt: 'desc' },
@@ -160,8 +160,23 @@ apiRouter.get('/applications', requireAuth, async (req, res) => {
         take,
       }),
       prisma.application.count({ where }),
+      prisma.application.count({
+        where: { ...where, status: { in: ['GENERATING', 'GENERATED'] } },
+      }),
+      prisma.application.count({
+        where: { ...where, status: { in: ['APPLIED', 'INTERVIEW'] } },
+      }),
+      prisma.application.count({
+        where: { ...where, status: { in: ['OFFER', 'REJECTED'] } },
+      }),
     ]);
-    res.json({ applications, total, skip, take });
+    res.json({
+      applications,
+      total,
+      stats: { total, inProgress, active, outcomes },
+      skip,
+      take
+    });
   } catch (e) {
     errorResponse(res, 500, e, 'DATABASE_ERROR');
   }
