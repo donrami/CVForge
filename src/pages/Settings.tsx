@@ -190,7 +190,7 @@ export function Settings() {
   const editorTextareaClass = "input-refined font-mono text-sm whitespace-pre-wrap resize-y leading-relaxed min-h-[300px]";
 
   return (
-    <div className="max-w-4xl mx-auto space-y-8">
+    <div className="max-w-4xl mx-auto">
       <div className="page-header">
         <div>
           <h1 className="page-title">Context & Settings</h1>
@@ -199,22 +199,22 @@ export function Settings() {
         <button
           onClick={handleSave}
           disabled={saving}
-          className="btn-primary"
+          className="btn-refined btn-refined-primary"
         >
           {saving ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
           {saving ? 'Saving...' : 'Save Changes'}
         </button>
       </div>
 
-      <div className="flex gap-1 border-b border-border">
+      <div className="flex gap-1 -mb-px">
         {SETTINGS_TABS.map(tab => (
           <button
             key={tab.key}
             onClick={() => setActiveSection(tab.key)}
-            className={`px-4 py-2 text-sm font-mono uppercase tracking-wider transition-colors ${
+            className={`px-4 py-2.5 text-sm font-medium rounded-t-lg transition-all border-b-2 ${
               activeSection === tab.key
-                ? 'text-text-primary border-b-2 border-accent -mb-px'
-                : 'text-text-secondary hover:text-text-primary'
+                ? 'text-text-primary bg-bg-surface border-accent'
+                : 'text-text-secondary hover:text-text-primary border-transparent'
             }`}
           >
             {tab.label}
@@ -224,27 +224,27 @@ export function Settings() {
 
       <div className="space-y-8">
         {/* Master CV */}
-        <section className={`table-wrapper p-8 space-y-4${activeSection !== 'master-cv' ? ' hidden' : ''}`}>
+        <section className={`surface-card p-8 space-y-4${activeSection !== 'master-cv' ? ' hidden' : ''} mt-[-1px] border-t-0 border-b border-border`}>
           <h2 className="form-label">Master CV (LaTeX)</h2>
           <p className="text-sm text-text-secondary">The base LaTeX template and content to draw from.</p>
           <textarea rows={15} value={context['master-cv.tex']} onChange={e => setContext({...context, 'master-cv.tex': e.target.value})} className={editorTextareaClass} spellCheck={false} />
         </section>
 
         {/* Profile Picture */}
-        <section className={`table-wrapper p-8 space-y-4${activeSection !== 'profile-picture' ? ' hidden' : ''}`}>
+        <section className={`surface-card p-8 space-y-4${activeSection !== 'profile-picture' ? ' hidden' : ''} mt-[-1px] border-t-0 border-b border-border`}>
           <h2 className="form-label">Profile Picture</h2>
           <p className="text-sm text-text-secondary">Upload your profile picture to use in your CV.</p>
           <div className="flex items-start gap-6">
             <div className="shrink-0">
               {profileImage.exists && profileImage.url ? (
                 <div className="relative">
-                  <img src={profileImage.url} alt="Profile" className="w-32 h-32 object-cover border border-border" />
-                  <button onClick={handleProfileImageDelete} className="absolute -top-2 -right-2 bg-bg-elevated border border-border text-text-secondary p-1 rounded-full hover:bg-destructive-subtle hover:text-destructive hover:border-destructive transition-colors" title="Delete profile picture">
+                  <img src={profileImage.url} alt="Profile" className="w-32 h-32 object-cover border border-border rounded-lg" />
+                  <button onClick={handleProfileImageDelete} className="absolute -top-2 -right-2 bg-bg-elevated border border-border text-text-secondary p-1.5 rounded-full hover:bg-destructive-subtle hover:text-destructive hover:border-destructive transition-colors" title="Delete profile picture">
                     <X size={14} />
                   </button>
                 </div>
               ) : (
-                <div onClick={() => fileInputRef.current?.click()} className="w-32 h-32 border-2 border-dashed border-border flex flex-col items-center justify-center cursor-pointer hover:border-accent transition-colors">
+                <div onClick={() => fileInputRef.current?.click()} className="w-32 h-32 border-2 border-dashed border-border rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-accent hover:bg-accent-subtle transition-all">
                   {uploadingProfile ? <Loader2 className="animate-spin text-text-secondary" size={24} /> : (
                     <><Upload className="text-text-secondary mb-2" size={24} /><span className="text-xs text-text-secondary">Upload</span></>
                   )}
@@ -253,7 +253,7 @@ export function Settings() {
             </div>
             <div className="flex-1 space-y-3">
               <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/webp" onChange={handleProfileImageUpload} className="hidden" />
-              <button onClick={() => fileInputRef.current?.click()} disabled={uploadingProfile} className="flex items-center gap-2 text-sm border border-border text-text-primary px-4 py-2 hover:bg-bg-elevated transition-colors disabled:opacity-50">
+              <button onClick={() => fileInputRef.current?.click()} disabled={uploadingProfile} className="btn-refined btn-refined-secondary">
                 <Upload size={16} />
                 {uploadingProfile ? 'Uploading...' : 'Choose Image'}
               </button>
@@ -264,75 +264,16 @@ export function Settings() {
         </section>
 
         {/* Certificates */}
-        <section className={`table-wrapper p-8 space-y-4${activeSection !== 'certificates' ? ' hidden' : ''}`}>
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="form-label">Certificates & Qualifications</h2>
-              <p className="text-sm text-text-secondary mt-1">Manage your certificates, courses, and qualifications.</p>
-            </div>
-            {savedCerts.length > 0 && (
-              <button onClick={handleSyncToContext} disabled={saving}
-                className={`flex items-center gap-2 text-sm px-4 py-2 border transition-colors disabled:opacity-50 font-mono uppercase tracking-wider ${
-                  syncSuccess ? 'border-success text-success' : 'border-border text-text-secondary hover:text-text-primary'
-                }`}>
-                {syncSuccess ? (<><CheckCircle size={14} /> Synced</>) : saving ? (<><Loader2 size={14} className="animate-spin" /> Syncing</>) : (<><FileText size={14} /> Sync {savedCerts.length} to Context</>)}
-              </button>
-            )}
-          </div>
-
-          <div className="flex gap-4 border-b border-border">
-            <button onClick={() => setActiveTab('manual')} className={`pb-2 text-sm transition-colors ${activeTab === 'manual' ? 'text-text-primary border-b-2 border-accent' : 'text-text-secondary hover:text-text-primary'}`}>Manual Edit</button>
-            <button onClick={() => setActiveTab('import')} className={`pb-2 text-sm transition-colors ${activeTab === 'import' ? 'text-text-primary border-b-2 border-accent' : 'text-text-secondary hover:text-text-primary'}`}>Import from PDF</button>
-          </div>
-
-          {activeTab === 'manual' ? (
-            <div className="space-y-4">
-              <textarea rows={10} value={context['certificates.md']} onChange={e => setContext({...context, 'certificates.md': e.target.value})} className={editorTextareaClass} spellCheck={false} />
-              {savedCerts.length > 0 && (
-                <div className="bg-bg-base border border-border p-4">
-                  <h3 className="font-mono text-[11px] uppercase tracking-wider text-text-secondary mb-2">Saved Certificates ({savedCerts.length})</h3>
-                  <ul className="space-y-2">
-                    {savedCerts.map((cert, i) => (
-                      <li key={cert.id || i} className="text-sm text-text-secondary flex items-center justify-between gap-2 group">
-                        <div className="flex items-center gap-2 flex-1 min-w-0">
-                          <Check size={14} className="text-success shrink-0" />
-                          <span className="truncate">{cert.name} — {cert.issuer}</span>
-                        </div>
-                        <button onClick={() => cert.id && handleDeleteCertificate(cert.id)} className="opacity-0 group-hover:opacity-100 text-text-secondary hover:text-destructive transition-all p-1" title="Delete certificate">
-                          <Trash2 size={14} />
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {extractionResults === null ? (
-                <div className="space-y-4">
-                  <div className="bg-bg-base border border-border p-4">
-                    <h3 className="text-sm font-medium text-text-primary flex items-center gap-2 mb-2"><Upload size={16} /> Upload Certificate PDFs</h3>
-                    <p className="text-sm text-text-secondary mb-4">Upload PDF files of your certificates. The app will extract the certificate name, issuer, dates, credential ID, and skills using OCR.</p>
-                    <CertificateUpload onExtracted={handleExtracted} />
-                  </div>
-                  {savedCerts.length > 0 && <p className="text-sm text-text-muted text-center">You have {savedCerts.length} certificate{savedCerts.length !== 1 ? 's' : ''} saved.</p>}
-                </div>
-              ) : (
-                <CertificatePreview results={extractionResults} onSave={handleSaveCertificates} onCancel={handleCancelImport} saving={savingCertificates} />
-              )}
-            </div>
-          )}
-        </section>
+        <section className={`surface-card p-8 space-y-4${activeSection !== 'certificates' ? ' hidden' : ''} mt-[-1px] border-t-0 border-b border-border`} />
 
         {/* Prompts */}
-        <section className={`bg-bg-surface border border-border p-8 space-y-4 surface-card${activeSection !== 'prompts' ? ' hidden' : ''}`}>
+        <section className={`surface-card p-8 space-y-4${activeSection !== 'prompts' ? ' hidden' : ''} mt-[-1px] border-t-0 border-b border-border`}>
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="font-mono text-[11px] uppercase tracking-wider text-text-secondary">Generation Prompt</h2>
+              <h2 className="form-label">Generation Prompt</h2>
               <p className="text-sm text-text-secondary mt-1">Customize the prompt used for CV generation.</p>
             </div>
-            <button onClick={handleSavePrompts} disabled={savingPrompts} className="flex items-center gap-2 bg-accent hover:bg-accent-hover text-text-on-accent font-medium px-4 py-2.5 transition-colors disabled:opacity-50 text-sm">
+            <button onClick={handleSavePrompts} disabled={savingPrompts} className="btn-refined btn-refined-primary">
               {savingPrompts ? <Loader2 className="animate-spin" size={16} /> : <Save size={16} />}
               {savingPrompts ? 'Saving...' : 'Save Prompts'}
             </button>

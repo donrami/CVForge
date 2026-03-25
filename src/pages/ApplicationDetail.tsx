@@ -137,8 +137,11 @@ export function ApplicationDetail() {
 
   let rawLog: any = null;
   let logParseError = false;
+  let isEmptyLog = false;
   try {
     rawLog = JSON.parse(app.generationLog || '{}');
+    // Check if the log is empty (empty object or empty string)
+    isEmptyLog = !app.generationLog || app.generationLog === '' || (typeof rawLog === 'object' && Object.keys(rawLog).length === 0);
   } catch {
     logParseError = true;
   }
@@ -165,59 +168,27 @@ export function ApplicationDetail() {
           <h1 className="page-title">{app.companyName}</h1>
           <p className="page-subtitle text-xl">{app.jobTitle}</p>
         </div>
-        <div className="flex gap-3 items-center">
-          <a
-            href={`/api/applications/${app.id}/download/tex`}
-            className="btn-ghost"
-          >
-            <FileText size={16} />
-            .tex
-          </a>
-          <a
-            href={`/api/applications/${app.id}/download/pdf`}
-            className="btn-primary"
-          >
-            <Download size={16} />
-            PDF
-          </a>
-          <button
-            onClick={handleSave}
-            disabled={!isDirty || saving}
-            className="btn-primary"
-          >
-            <Save size={16} />
-            {saving ? 'Saving...' : 'Save Changes'}
-          </button>
-          <button
-            onClick={handleDelete}
-            className="btn-ghost hover:text-destructive hover:border-destructive"
-            title="Delete"
-          >
-            <Trash2 size={16} />
-            Delete
-          </button>
-        </div>
       </div>
 
       <div className="grid grid-cols-3 gap-8">
         <div className="col-span-2 space-y-8">
-          <section className="table-wrapper p-6 space-y-4">
+          <section className="surface-card p-6 space-y-4">
             <h2 className="form-label">Job Description</h2>
             <div className="text-text-primary text-sm whitespace-pre-wrap leading-relaxed">
               {app.jobDescription}
             </div>
           </section>
 
-          <section className="table-wrapper p-6 space-y-4">
+          <section className="surface-card p-6 space-y-4">
             <h2 className="form-label">Generation Log</h2>
             {logParseError ? (
               <p className="text-sm text-text-muted italic">Log unavailable</p>
             ) : isLegacy ? (
               <div className="space-y-4">
-                <span className="inline-block font-mono text-[10px] uppercase tracking-wider bg-bg-elevated text-text-secondary border border-border px-2 py-0.5">Legacy</span>
+                <span className="inline-block font-mono text-[10px] uppercase tracking-wider bg-bg-elevated text-text-secondary px-2 py-0.5 rounded">Legacy</span>
                 {(rawLog as any[]).map((entry: any, i: number) => (
-                  <details key={i} className="group border border-border overflow-hidden">
-                    <summary className="bg-bg-elevated p-4 cursor-pointer font-mono text-sm flex justify-between items-center text-text-secondary group-hover:text-accent transition-colors">
+                  <details key={i} className="group border border-border overflow-hidden rounded-lg">
+                    <summary className="bg-bg-elevated p-4 cursor-pointer font-mono text-sm flex justify-between items-center text-text-secondary group-hover:text-accent transition-colors rounded-lg">
                       <span>Pass {entry.pass}: {entry.critique?.split('\n')[0]?.substring(0, 60)}...</span>
                       <span className="text-xs text-text-muted">expand</span>
                     </summary>
@@ -237,8 +208,8 @@ export function ApplicationDetail() {
                     )}
                   </div>
                 )}
-                <details className="group border border-border overflow-hidden">
-                  <summary className="bg-bg-elevated p-4 cursor-pointer font-mono text-sm flex justify-between items-center text-text-secondary group-hover:text-accent transition-colors">
+                <details className="group border border-border overflow-hidden rounded-lg">
+                  <summary className="bg-bg-elevated p-4 cursor-pointer font-mono text-sm flex justify-between items-center text-text-secondary group-hover:text-accent transition-colors rounded-lg">
                     <span>Phase 1: Analysis</span>
                     <span className="text-xs text-text-muted">expand</span>
                   </summary>
@@ -246,8 +217,8 @@ export function ApplicationDetail() {
                     {rawLog.phase1 || 'No analysis content'}
                   </div>
                 </details>
-                <details className="group border border-border overflow-hidden">
-                  <summary className="bg-bg-elevated p-4 cursor-pointer font-mono text-sm flex justify-between items-center text-text-secondary group-hover:text-accent transition-colors">
+                <details className="group border border-border overflow-hidden rounded-lg">
+                  <summary className="bg-bg-elevated p-4 cursor-pointer font-mono text-sm flex justify-between items-center text-text-secondary group-hover:text-accent transition-colors rounded-lg">
                     <span>Phase 2: Review</span>
                     <span className="text-xs text-text-muted">expand</span>
                   </summary>
@@ -270,8 +241,8 @@ export function ApplicationDetail() {
                     <span>Detected: <span className="font-mono text-text-secondary">{rawLog.detectedLanguage}</span></span>
                   )}
                 </div>
-                <details className="group border border-border overflow-hidden">
-                  <summary className="bg-bg-elevated p-4 cursor-pointer font-mono text-sm flex justify-between items-center text-text-secondary group-hover:text-accent transition-colors">
+                <details className="group border border-border overflow-hidden rounded-lg">
+                  <summary className="bg-bg-elevated p-4 cursor-pointer font-mono text-sm flex justify-between items-center text-text-secondary group-hover:text-accent transition-colors rounded-lg">
                     <span>CV Data</span>
                     <span className="text-xs text-text-muted">expand</span>
                   </summary>
@@ -280,12 +251,14 @@ export function ApplicationDetail() {
                   </div>
                 </details>
               </div>
+            ) : isEmptyLog ? (
+              <p className="text-sm text-text-muted italic">No generation log available</p>
             ) : (
-              <p className="text-sm text-text-muted italic">Log unavailable</p>
+              <p className="text-sm text-text-muted italic">Log format not recognized</p>
             )}
           </section>
 
-          <section className="bg-bg-surface border border-border overflow-hidden surface-card">
+          <section className="surface-card overflow-hidden">
             <details className="group">
               <summary className="p-6 cursor-pointer flex justify-between items-center text-text-secondary group-hover:text-accent transition-colors">
                 <span className="flex items-center gap-2">
@@ -304,19 +277,19 @@ export function ApplicationDetail() {
                       onChange={e => setLatexSource(e.target.value)}
                       rows={20}
                       spellCheck={false}
-                      className="w-full bg-bg-base border border-border px-4 py-3 text-text-primary focus:outline-none focus:border-accent transition-colors resize-y font-mono text-sm leading-relaxed inset-surface"
+                      className="input-refined min-h-[400px] font-mono text-sm leading-relaxed resize-y"
                     />
                     <div className="flex items-center gap-3">
                       <button
                         onClick={handleLatexSave}
                         disabled={!isDirty || saveStatus === 'saving'}
-                        className="flex items-center gap-2 bg-accent hover:bg-accent-hover text-text-on-accent font-mono text-xs uppercase tracking-wider px-4 py-2 transition-colors disabled:opacity-40 disabled:cursor-not-allowed rounded-md"
+                        className="btn-refined btn-refined-primary"
                       >
                         <Save size={14} />
                         {saveStatus === 'saving' ? 'Saving...' : 'Save'}
                       </button>
                       {saveStatus === 'success' && (
-                        <span className="text-sm text-success flex items-center gap-1 font-mono">
+                        <span className="text-sm text-success flex items-center gap-1">
                           <Check size={14} /> Saved
                         </span>
                       )}
@@ -334,13 +307,51 @@ export function ApplicationDetail() {
         </div>
 
         <div className="space-y-6">
-          <section className="bg-bg-surface border border-border p-6 space-y-4 surface-card">
+          <section className="surface-card p-6 space-y-4">
+            <h2 className="font-mono text-[11px] uppercase tracking-wider text-text-secondary">Actions</h2>
+            <div className="flex flex-col gap-3">
+              <div className="flex gap-3">
+                <a
+                  href={`/api/applications/${app.id}/download/tex`}
+                  className="btn-refined btn-refined-secondary flex-1"
+                >
+                  <FileText size={16} />
+                  .tex
+                </a>
+                <a
+                  href={`/api/applications/${app.id}/download/pdf`}
+                  className="btn-refined btn-refined-secondary flex-1"
+                >
+                  <Download size={16} />
+                  PDF
+                </a>
+              </div>
+              <button
+                onClick={handleSave}
+                disabled={!isDirty || saving}
+                className="btn-refined btn-refined-primary w-full"
+              >
+                <Save size={16} />
+                {saving ? 'Saving...' : 'Save Changes'}
+              </button>
+              <button
+                onClick={handleDelete}
+                className="btn-refined btn-refined-secondary hover:text-destructive w-full"
+                title="Delete"
+              >
+                <Trash2 size={16} />
+                Delete
+              </button>
+            </div>
+          </section>
+
+          <section className="surface-card p-6 space-y-4">
             <h2 className="font-mono text-[11px] uppercase tracking-wider text-text-secondary">Status</h2>
             
             <select
               value={status}
               onChange={e => setStatus(e.target.value)}
-              className="w-full bg-bg-base border border-border px-4 py-2.5 text-text-primary focus:outline-none focus:border-accent transition-colors font-mono text-sm"
+              className="input-refined"
             >
               {STATUSES.map(s => (
                 <option key={s} value={s}>{s}</option>
@@ -353,13 +364,13 @@ export function ApplicationDetail() {
                 rows={4}
                 value={notes}
                 onChange={e => setNotes(e.target.value)}
-                className="w-full bg-bg-base border border-border px-4 py-3 text-text-primary focus:outline-none focus:border-accent transition-colors resize-y text-sm inset-surface"
+                className="input-refined resize-y"
                 placeholder="Interview dates, salary expectations..."
               />
             </div>
           </section>
 
-          <section className="bg-bg-surface border border-border p-6 space-y-4 surface-card">
+          <section className="surface-card p-6 space-y-4">
             <h2 className="font-mono text-[11px] uppercase tracking-wider text-text-secondary">Details</h2>
             <dl className="space-y-2 text-sm">
               <div className="flex justify-between border-b border-border pb-2">
@@ -381,16 +392,18 @@ export function ApplicationDetail() {
 
       {/* Unsaved changes warning dialog */}
       {showUnsavedWarning && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-bg-surface border border-border p-6 max-w-md w-full">
-            <h3 className="text-lg font-serif text-text-primary mb-2">Unsaved Changes</h3>
-            <p className="text-sm text-text-secondary mb-4">
-              You have unsaved changes. Are you sure you want to leave?
-            </p>
-            <div className="flex gap-3 justify-end">
+        <div className="dialog-backdrop">
+          <div className="dialog-content border-l-4 border-l-warning" onClick={e => e.stopPropagation()}>
+            <div className="p-6">
+              <h3 className="font-serif text-lg text-text-primary mb-2">Unsaved Changes</h3>
+              <p className="text-sm text-text-secondary mb-4">
+                You have unsaved changes. Are you sure you want to leave?
+              </p>
+            </div>
+            <div className="px-6 py-4 bg-bg-elevated border-t border-border flex justify-end gap-3">
               <button
                 onClick={() => setShowUnsavedWarning(false)}
-                className="px-4 py-2 border border-border text-text-secondary font-mono text-xs uppercase tracking-wider hover:bg-bg-elevated transition-colors"
+                className="btn-refined btn-refined-secondary"
               >
                 Stay
               </button>
@@ -399,7 +412,7 @@ export function ApplicationDetail() {
                   setShowUnsavedWarning(false);
                   navigate(-1);
                 }}
-                className="px-4 py-2 bg-destructive text-text-on-accent font-mono text-xs uppercase tracking-wider hover:bg-destructive/90 transition-colors"
+                className="btn-refined bg-destructive text-text-on-accent hover:bg-destructive/90"
               >
                 Discard & Leave
               </button>

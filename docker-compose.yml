@@ -7,9 +7,7 @@ services:
     environment:
       - DATABASE_URL=postgresql://cvforge:cvforge@db:5432/cvforge
       - GEMINI_API_KEY=${GEMINI_API_KEY}
-      - AUTH_PASSWORD_HASH=${AUTH_PASSWORD_HASH}
-      - NEXTAUTH_SECRET=${NEXTAUTH_SECRET}
-      - NEXTAUTH_URL=${NEXTAUTH_URL}
+      - APP_URL=${APP_URL}
     volumes:
       - ./context:/app/context
       - ./generated:/app/generated

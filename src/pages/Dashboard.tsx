@@ -209,13 +209,14 @@ export function Dashboard() {
     setRestoreAppCount(0);
   };
 
-  const toolbarBtnClass = "btn-ghost";
-
   return (
     <div className="space-y-8">
+      {/* Page Header */}
       <div className="page-header">
-        <h1 className="page-title">Applications</h1>
-        <p className="page-subtitle">Track and manage your generated CVs</p>
+        <div>
+          <h1 className="page-title">Applications</h1>
+          <p className="page-subtitle">Track and manage your generated CVs</p>
+        </div>
         <Link 
           to="/new" 
           className="btn-primary"
@@ -225,6 +226,7 @@ export function Dashboard() {
         </Link>
       </div>
 
+      {/* Toolbar */}
       <div className="toolbar">
         <div className="search-wrapper">
           <Search className="search-icon" size={16} />
@@ -236,33 +238,34 @@ export function Dashboard() {
             className="refined-input"
           />
         </div>
-        <button className={toolbarBtnClass}>
+        <button className="btn-ghost">
           <Filter size={14} />
           Filter
         </button>
-        <button disabled={backupLoading} onClick={handleBackup} className={toolbarBtnClass}>
+        <button disabled={backupLoading} onClick={handleBackup} className="btn-ghost">
           {backupLoading ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
           Backup
         </button>
-        <button disabled={exportLoading} onClick={handleExportPDF} className={toolbarBtnClass}>
+        <button disabled={exportLoading} onClick={handleExportPDF} className="btn-ghost">
           {exportLoading ? <Loader2 size={14} className="animate-spin" /> : <FileText size={14} />}
           Export PDF
         </button>
-        <button disabled={restoreLoading} onClick={handleRestoreClick} className={toolbarBtnClass}>
+        <button disabled={restoreLoading} onClick={handleRestoreClick} className="btn-ghost">
           {restoreLoading ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
           Restore
         </button>
       </div>
 
-      <div className="table-wrapper">
+      {/* Table */}
+      <div className="table-wrapper surface-card">
         <table className="refined-table">
           <thead>
             <tr className="table-header">
               <th className="table-th">Company</th>
               <th className="table-th">Role</th>
               <th className="table-th">Status</th>
-              <th className="table-th">Lang</th>
-              <th className="table-th">Date</th>
+              <th className="table-th hide-mobile">Lang</th>
+              <th className="table-th hide-mobile">Date</th>
               <th className="table-th text-right">Actions</th>
             </tr>
           </thead>
@@ -286,8 +289,8 @@ export function Dashboard() {
                 <td className="table-cell">
                   <StatusBadge status={app.status} />
                 </td>
-                <td className="table-cell-mono">{app.targetLanguage}</td>
-                <td className="table-cell-mono whitespace-nowrap">
+                <td className="table-cell-mono hide-mobile">{app.targetLanguage}</td>
+                <td className="table-cell-mono whitespace-nowrap hide-mobile">
                   {format(new Date(app.createdAt), 'dd.MM.yyyy')}
                 </td>
                 <td className="table-cell-actions" onClick={e => e.stopPropagation()}>
@@ -307,14 +310,17 @@ export function Dashboard() {
         </table>
       </div>
 
+      {/* Pagination */}
       <PaginationControls
         currentPage={currentPage}
         totalPages={totalPages}
         totalItems={total}
+        pageSize={pageSize}
         onPageChange={setCurrentPage}
         disabled={loading}
       />
 
+      {/* Restore Dialog */}
       <RestoreConfirmationDialog
         open={restoreDialogOpen}
         applicationCount={restoreAppCount}

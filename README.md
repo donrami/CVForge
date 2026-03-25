@@ -20,7 +20,6 @@ CVForge is a personal, self-hosted AI-powered CV generator and job application t
 - **LaTeX Sanitizer** — AI-generated LaTeX is stripped of dangerous commands (`\input`, `\write18`, etc.) and special characters are escaped before compilation
 - **Structured Logging** — Pino-based JSON logging throughout the server
 - **Chat Assistant** — Interactive AI chat interface for prompt refinement and CV advice
-- **Password Protection** — Optional master password authentication via `APP_PASSWORD` environment variable
 
 ## Tech Stack
 
@@ -38,7 +37,6 @@ CVForge is a personal, self-hosted AI-powered CV generator and job application t
    - `GEMINI_API_KEY` — Google Gemini API key
    - `APP_URL` — The URL where this app is hosted (e.g., `http://localhost:3000`)
    - `DATABASE_URL` — PostgreSQL connection string (default works with Docker Compose)
-   - `APP_PASSWORD` — (optional) Master password for authentication. If not set, no password is required.
 3. Start with Docker Compose:
    ```bash
    docker compose up --build -d
@@ -82,8 +80,8 @@ npm run dev
 │       ├── template-deriver.ts       # Auto-derives Handlebars templates from LaTeX
 │       └── logger.ts                 # Pino logger
 ├── src/                   # React frontend
-│   ├── pages/             # Dashboard, NewApplication, ApplicationDetail, Settings, Login
-│   ├── components/        # UI components (PaginationControls, RestoreConfirmationDialog), dialogs, layout
+│   ├── pages/             # Dashboard, NewApplication, ApplicationDetail, Settings
+│   ├── components/        # UI components (PaginationControls), dialogs, layout
 │   ├── context/           # DialogContext, AuthContext (sessionStorage-based auth state)
 │   └── hooks                 # useJobStatus, useActiveJobChecker
 ├── context/               # User context files (master CV, certificates, prompts)

@@ -3,48 +3,74 @@ import { ChevronLeft, ChevronRight } from 'lucide-react';
 interface PaginationControlsProps {
   currentPage: number;
   totalPages: number;
-  totalItems: number;
+  totalItems?: number;
+  pageSize?: number;
   onPageChange: (page: number) => void;
   disabled?: boolean;
+  containerClassName?: string;
 }
 
 export function PaginationControls({
   currentPage,
   totalPages,
   totalItems,
+  pageSize = 10,
   onPageChange,
   disabled = false,
+  containerClassName = '',
 }: PaginationControlsProps) {
-  const isFirstPage = currentPage <= 1;
-  const isLastPage = currentPage >= totalPages;
+  if (totalPages <= 1 && !totalItems) return null;
+
+  const startItem = (currentPage - 1) * pageSize + 1;
+  const endItem = Math.min(currentPage * pageSize, totalItems || totalPages * pageSize);
 
   return (
-    <div className="flex items-center justify-between py-3">
-      <span className="text-xs font-mono text-text-muted">
-        {totalItems} {totalItems === 1 ? 'application' : 'applications'}
-      </span>
-
-      <div className="flex items-center gap-3">
+    <div className={`flex items-center justify-between gap-4 ${containerClassName}`}>
+      <div className="text-sm text-text-secondary">
+        {totalItems !== undefined ? (
+          <span>{startItem}–{endItem} of {totalItems} applications</span>
+        ) : (
+          <span>Page {currentPage} of {totalPages}</span>
+        )}
+      </div>
+      
+      <div className="flex items-center gap-2">
         <button
           onClick={() => onPageChange(currentPage - 1)}
-          disabled={disabled || isFirstPage}
-          className="flex items-center gap-1 px-2 py-1 text-xs font-mono text-text-secondary border border-border hover:text-text-primary transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+          disabled={disabled || currentPage <= 1}
+          className="btn-refined btn-refined-secondary px-3 py-2 disabled:opacity-40"
+          aria-label="Previous page"
         >
-          <ChevronLeft size={14} />
-          Previous
+          <ChevronLeft size={16} />
         </button>
-
-        <span className="text-xs font-mono text-text-muted">
-          {currentPage} / {totalPages}
-        </span>
+        
+        <div className="flex items-center gap-1">
+          {Array.from({ length: totalPages }, (_, i) => i + 1).map(pageNum => (
+            <button
+              key={pageNum}
+              onClick={() => onPageChange(pageNum)}
+              disabled={disabled}
+              className={`
+                w-9 h-9 rounded-lg text-sm font-medium transition-all duration-200
+                ${pageNum === currentPage
+                  ? 'bg-accent text-text-on-accent shadow-sm'
+                  : 'text-text-secondary hover:bg-bg-elevated hover:text-text-primary disabled:hover:bg-transparent disabled:hover:text-text-secondary'
+                }
+                ${disabled ? 'disabled:opacity-40' : ''}
+              `}
+            >
+              {pageNum}
+            </button>
+          ))}
+        </div>
 
         <button
           onClick={() => onPageChange(currentPage + 1)}
-          disabled={disabled || isLastPage}
-          className="flex items-center gap-1 px-2 py-1 text-xs font-mono text-text-secondary border border-border hover:text-text-primary transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+          disabled={disabled || currentPage >= totalPages}
+          className="btn-refined btn-refined-secondary px-3 py-2 disabled:opacity-40"
+          aria-label="Next page"
         >
-          Next
-          <ChevronRight size={14} />
+          <ChevronRight size={16} />
         </button>
       </div>
     </div>

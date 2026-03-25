@@ -46,7 +46,6 @@ src/                              # React SPA frontend
     NewApplication.tsx            # Form: company name, job title, job description, target language (EN/DE), additional context. Uses job-based generation with polling for progress. User can navigate away while generation continues in background. Includes duplicate detection.
     ApplicationDetail.tsx         # View application details, download PDF/TEX, update status/notes/dates, regenerate with additional context.
     Settings.tsx                 # Tabs: Master CV editor, Certificate management (upload/extract/edit/sync), Profile image upload, Prompt editor (generator with reset-to-defaults).
-    Login.tsx                    # Password-based authentication page using master password from APP_PASSWORD env var. Protects access to the application.
   hooks/
     useJobStatus.ts              # Hook for polling job status until completion or error. Manages polling lifecycle, callbacks for progress/complete/error.
     useActiveJobChecker.ts       # Hook for monitoring completed jobs when user returns to the app. Stores known job IDs in sessionStorage for cross-page-load continuity.
@@ -157,7 +156,7 @@ Three models in PostgreSQL via Prisma:
 5. When user's polling detects COMPLETED status, show persistent toast notification and navigate to dashboard
 6. PDF compilation happens on-demand when user downloads (not during generation)
 
-### Background Generation
+## Background Generation
 
 The generation pipeline supports background processing:
 - User can navigate away from NewApplication page after submitting

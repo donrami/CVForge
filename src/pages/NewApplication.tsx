@@ -260,9 +260,6 @@ export function NewApplication() {
     }
   };
 
-  const labelClass = "form-label";
-  const inputClass = "input-refined";
-
   const isGenerating = generationState.status === 'started' || generationState.status === 'polling';
   const isComplete = generationState.status === 'complete';
   const hasError = generationState.status === 'error';
@@ -275,15 +272,15 @@ export function NewApplication() {
       </div>
 
       {isGenerating && !isComplete && !hasError && (
-        <div className="table-wrapper">
-          <div className="p-8 space-y-6">
+        <div className="surface-card p-8">
+          <div className="space-y-6">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
               <StatusIcon status={generationState.status} />
                 <span className="font-serif text-xl text-text-primary">
                   {generationState.status === 'started' && 'Starting...'}
                   {generationState.status === 'polling' && generationState.phase === 'preparing' && 'Preparing...'}
-                  {generationState.status === 'polling' && generationState.phase === 'ai-working' && 'Forging CV'}
+                  {generationState.status === 'polling' && generationState.phase === 'ai-working' && 'Forging your CV'}
                   {generationState.status === 'polling' && generationState.phase === 'finalizing' && 'Wrapping up...'}
                 </span>
               </div>
@@ -297,13 +294,13 @@ export function NewApplication() {
             </div>
 
             {generationState.status === 'started' && (
-              <div className="py-4 animate-pulse">
+              <div className="py-4">
                 <p className="text-sm text-text-secondary">Creating generation job...</p>
               </div>
             )}
 
             {generationState.status === 'polling' && generationState.phase === 'preparing' && (
-              <div className="py-4 animate-pulse">
+              <div className="py-4">
                 <p className="text-sm text-text-secondary">Assembling your profile and job context...</p>
               </div>
             )}
@@ -339,7 +336,7 @@ export function NewApplication() {
             <div className="pt-4 border-t border-border flex justify-end">
               <button
                 onClick={handleCancel}
-                className="btn-ghost"
+                className="btn-refined btn-refined-secondary"
               >
                 Cancel
               </button>
@@ -349,93 +346,89 @@ export function NewApplication() {
       )}
 
       {isComplete && !hasError && (
-        <div className="bg-bg-surface border border-status-offer overflow-hidden surface-card">
-          <div className="px-8 pt-8 pb-6 space-y-6">
-            <div className="flex items-center gap-3">
-              <CheckCircle className="text-status-offer" size={24} />
-              <span className="font-serif text-xl text-text-primary">CV Generated Successfully!</span>
-            </div>
-            <p className="text-sm text-text-secondary">
-              Your CV is ready. Redirecting to dashboard...
-            </p>
-            <div className="flex justify-center py-4">
-              <Loader2 className="animate-spin text-accent" size={24} />
-            </div>
+        <div className="surface-card border-l-4 border-l-status-offer p-8">
+          <div className="flex items-center gap-3 mb-4">
+            <CheckCircle className="text-status-offer" size={24} />
+            <span className="font-serif text-xl text-text-primary">CV Generated Successfully!</span>
+          </div>
+          <p className="text-sm text-text-secondary mb-6">
+            Your CV is ready. Redirecting to dashboard...
+          </p>
+          <div className="flex justify-center py-4">
+            <Loader2 className="animate-spin text-accent" size={24} />
           </div>
         </div>
       )}
 
       {hasError && !isGenerating && (
-        <div className="bg-bg-surface border border-destructive overflow-hidden surface-card">
-          <div className="px-8 pt-8 pb-6 space-y-6">
-            <div className="flex items-center gap-3">
-              <AlertCircle className="text-destructive" size={24} />
-              <span className="font-serif text-xl text-text-primary">Generation Failed</span>
-            </div>
-            <p className="text-sm text-text-secondary">
-              {generationState.error || 'An unexpected error occurred'}
-            </p>
-            <div className="pt-4 border-t border-border">
-              <button
-                onClick={handleCancel}
-                className="flex items-center gap-2 bg-accent hover:bg-accent-hover text-text-on-accent font-medium px-6 py-2.5 transition-colors"
-              >
-                Try Again
-              </button>
-            </div>
+        <div className="surface-card border-l-4 border-l-destructive p-8">
+          <div className="flex items-center gap-3 mb-4">
+            <AlertCircle className="text-destructive" size={24} />
+            <span className="font-serif text-xl text-text-primary">Generation Failed</span>
+          </div>
+          <p className="text-sm text-text-secondary mb-6">
+            {generationState.error || 'An unexpected error occurred'}
+          </p>
+          <div className="pt-4 border-t border-border">
+            <button
+              onClick={handleCancel}
+              className="btn-refined btn-refined-primary"
+            >
+              Try Again
+            </button>
           </div>
         </div>
       )}
 
       {!isGenerating && !isComplete && (
-        <form onSubmit={handleSubmit} className="table-wrapper space-y-6 p-8">
+        <form onSubmit={handleSubmit} className="surface-card p-8 space-y-6">
           <div className="grid grid-cols-2 gap-6">
             <div>
-              <label className={labelClass}>Company Name</label>
+              <label className="form-label">Company Name</label>
               <input 
                 required
                 type="text" 
                 value={formData.companyName}
                 onChange={e => setFormData({...formData, companyName: e.target.value})}
-                className={inputClass}
+                className="input-refined"
               />
             </div>
             <div>
-              <label className={labelClass}>Job Title</label>
+              <label className="form-label">Job Title</label>
               <input 
                 required
                 type="text" 
                 value={formData.jobTitle}
                 onChange={e => setFormData({...formData, jobTitle: e.target.value})}
-                className={inputClass}
+                className="input-refined"
               />
             </div>
           </div>
 
           <div>
-            <label className={labelClass}>Job Description</label>
+            <label className="form-label">Job Description</label>
             <textarea 
               required
               rows={8}
               value={formData.jobDescription}
               onChange={e => setFormData({...formData, jobDescription: e.target.value})}
-              className={`${inputClass} min-h-[200px] resize-y font-mono text-sm`}
+              className="input-refined min-h-[200px] resize-y font-mono text-sm"
               placeholder="Paste the full job description here..."
             />
           </div>
 
           <div>
-            <label className={labelClass}>Target Language</label>
-            <div className="flex gap-0">
+            <label className="form-label">Target Language</label>
+            <div className="flex gap-2">
               {['EN', 'DE'].map(lang => (
                 <button
                   key={lang}
                   type="button"
                   onClick={() => setFormData({...formData, targetLanguage: lang})}
-                  className={`px-4 py-2 font-mono text-sm border transition-all ${
+                  className={`px-4 py-2 font-mono text-sm rounded-lg transition-all ${
                     formData.targetLanguage === lang
-                      ? 'bg-accent text-text-on-accent border-accent rounded-md'
-                      : 'bg-transparent text-text-secondary border-border hover:text-text-primary rounded-md'
+                      ? 'bg-accent text-text-on-accent shadow-sm'
+                      : 'bg-bg-elevated text-text-secondary hover:text-text-primary'
                   }`}
                 >
                   {lang}
@@ -445,12 +438,12 @@ export function NewApplication() {
           </div>
 
           <div>
-            <label className={labelClass}>Additional Context (Optional)</label>
+            <label className="form-label">Additional Context (Optional)</label>
             <textarea 
               rows={3}
               value={formData.additionalContext}
               onChange={e => setFormData({...formData, additionalContext: e.target.value})}
-              className={`${inputClass} resize-y`}
+              className="input-refined resize-y"
               placeholder="E.g., Emphasize my React experience, ignore my early PHP roles."
             />
           </div>
@@ -460,7 +453,7 @@ export function NewApplication() {
               type="button"
               onClick={handleLoadLast}
               disabled={loadingLast}
-              className="btn-ghost rounded-md"
+              className="btn-refined btn-refined-secondary"
             >
               {loadingLast ? <Loader2 className="animate-spin" size={16} /> : <RotateCcw size={16} />}
               Load Last
@@ -468,7 +461,7 @@ export function NewApplication() {
             <button 
               type="submit"
               disabled={isCheckingDuplicate}
-              className="btn-primary"
+              className="btn-refined btn-refined-primary"
             >
               {isCheckingDuplicate ? (
                 <>
@@ -488,25 +481,25 @@ export function NewApplication() {
 
       {/* Duplicate Confirmation Dialog */}
       {showDuplicateDialog && duplicateWarning && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-          <div className="bg-bg-surface border border-border shadow-2xl max-w-md w-full animate-in zoom-in-95 duration-200">
+        <div className="dialog-backdrop">
+          <div className="dialog-content border-l-4 border-l-warning" onClick={e => e.stopPropagation()}>
             <div className="p-6">
               <div className="flex items-start gap-4">
-                <div className="shrink-0 w-10 h-10 rounded-full bg-yellow-500/10 flex items-center justify-center">
-                  <span className="text-yellow-500 text-xl">⚠️</span>
+                <div className="shrink-0 w-10 h-10 rounded-full bg-warning-subtle flex items-center justify-center">
+                  <span className="text-warning text-xl">⚠️</span>
                 </div>
                 <div className="flex-1">
-                  <h3 className="text-lg font-medium text-text-primary mb-2">
+                  <h3 className="font-serif text-lg text-text-primary mb-2">
                     Potential Duplicate Detected
                   </h3>
-                  <p className="text-sm text-text-secondary leading-relaxed">
+                  <p className="text-sm text-text-secondary leading-relaxed mb-4">
                     This job description is similar to existing applications. Do you want to generate a new CV anyway?
                   </p>
                   
-                  <div className="mt-4 p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-md">
+                  <div className="p-3 bg-warning-subtle border border-warning/30 rounded-lg">
                     <ul className="space-y-2">
                       {duplicateWarning.matches.slice(0, 3).map((match) => (
-                        <li key={match.id} className="text-xs">
+                        <li key={match.id} className="text-xs text-text-secondary">
                           • <span className="font-medium text-text-primary">{match.companyName}</span> - {match.jobTitle}{' '}
                           <span className="text-text-muted">(~{Math.round(match.similarity * 100)}% match)</span>
                         </li>
@@ -517,16 +510,16 @@ export function NewApplication() {
               </div>
             </div>
 
-            <div className="px-6 py-4 bg-bg-elevated/50 border-t border-border flex justify-end gap-3">
+            <div className="px-6 py-4 bg-bg-elevated border-t border-border flex justify-end gap-3">
               <button
                 onClick={handleDuplicateCancel}
-                className="px-4 py-2 text-sm font-medium text-text-secondary hover:text-text-primary transition-colors"
+                className="btn-refined btn-refined-secondary"
               >
                 Cancel
               </button>
               <button
                 onClick={handleDuplicateConfirm}
-                className="px-4 py-2 text-sm font-medium bg-accent hover:bg-accent-hover text-text-on-accent transition-colors"
+                className="btn-refined btn-refined-primary"
               >
                 Generate Anyway
               </button>

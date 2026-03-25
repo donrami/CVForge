@@ -1,116 +1,91 @@
-import { useEffect, useRef } from 'react';
-import { AlertTriangle } from 'lucide-react';
+import { useEffect } from 'react';
+import { AlertTriangle, Info } from 'lucide-react';
 
 interface ConfirmDialogProps {
-  isOpen: boolean;
+  open: boolean;
   title: string;
   message: string;
   confirmText?: string;
   cancelText?: string;
-  severity?: 'destructive' | 'primary';
+  severity?: 'warning' | 'destructive' | 'info';
   onConfirm: () => void;
   onCancel: () => void;
 }
 
 export function ConfirmDialog({
-  isOpen,
+  open,
   title,
   message,
   confirmText = 'Confirm',
   cancelText = 'Cancel',
-  severity = 'primary',
+  severity = 'warning',
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
-  const confirmButtonRef = useRef<HTMLButtonElement>(null);
-  const dialogRef = useRef<HTMLDivElement>(null);
-
-  // Focus management and escape key handling
   useEffect(() => {
-    if (!isOpen) return;
-
-    // Focus confirm button after dialog opens
-    const timeoutId = setTimeout(() => {
-      confirmButtonRef.current?.focus();
-    }, 50);
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        onCancel();
-      }
-    };
-
-    document.addEventListener('keydown', handleKeyDown);
-    document.body.style.overflow = 'hidden';
-
+    if (open) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
     return () => {
-      clearTimeout(timeoutId);
-      document.removeEventListener('keydown', handleKeyDown);
       document.body.style.overflow = '';
     };
-  }, [isOpen, onCancel]);
+  }, [open]);
 
-  // Handle click outside
-  const handleBackdropClick = (e: React.MouseEvent) => {
-    if (e.target === dialogRef.current) {
-      onCancel();
-    }
+  if (!open) return null;
+
+  const severityStyles = {
+    warning: {
+      border: 'border-l-warning',
+      icon: 'text-warning',
+      bg: 'bg-warning-subtle',
+    },
+    destructive: {
+      border: 'border-l-destructive',
+      icon: 'text-destructive',
+      bg: 'bg-destructive-subtle',
+    },
+    info: {
+      border: 'border-l-accent',
+      icon: 'text-accent',
+      bg: 'bg-accent-subtle',
+    },
   };
 
-  if (!isOpen) return null;
-
-  const isDestructive = severity === 'destructive';
+  const style = severityStyles[severity];
 
   return (
-    <div
-      ref={dialogRef}
-      onClick={handleBackdropClick}
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-overlay backdrop-blur-sm animate-in fade-in duration-200"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="confirm-dialog-title"
-      aria-describedby="confirm-dialog-description"
-    >
-      <div className="bg-bg-surface border border-border shadow-2xl max-w-md w-full animate-in zoom-in-95 duration-200">
+    <div className="dialog-backdrop" onClick={onCancel}>
+      <div 
+        className={`dialog-content border-l-4 ${style.border}`}
+        onClick={e => e.stopPropagation()}
+      >
         <div className="p-6">
           <div className="flex items-start gap-4">
-            {isDestructive && (
-              <div className="shrink-0 w-10 h-10 rounded-full bg-destructive/10 flex items-center justify-center">
-                <AlertTriangle className="w-5 h-5 text-destructive" />
-              </div>
-            )}
+            <div className={`shrink-0 w-10 h-10 rounded-full flex items-center justify-center ${style.bg}`}>
+              {severity === 'destructive' ? (
+                <AlertTriangle size={20} className={style.icon} />
+              ) : (
+                <Info size={20} className={style.icon} />
+              )}
+            </div>
             <div className="flex-1">
-              <h3
-                id="confirm-dialog-title"
-                className="text-lg font-medium text-text-primary mb-2"
-              >
-                {title}
-              </h3>
-              <p
-                id="confirm-dialog-description"
-                className="text-sm text-text-secondary leading-relaxed"
-              >
-                {message}
-              </p>
+              <h3 className="font-serif text-lg text-text-primary mb-2">{title}</h3>
+              <p className="text-sm text-text-secondary leading-relaxed">{message}</p>
             </div>
           </div>
         </div>
-
-        <div className="px-6 py-4 bg-bg-elevated/50 border-t border-border flex justify-end gap-3">
+        <div className="px-6 py-4 bg-bg-elevated border-t border-border flex justify-end gap-3">
           <button
             onClick={onCancel}
-            className="px-4 py-2 text-sm font-medium text-text-secondary hover:text-text-primary transition-colors"
+            className="btn-refined btn-refined-secondary"
           >
             {cancelText}
           </button>
           <button
-            ref={confirmButtonRef}
             onClick={onConfirm}
-            className={`px-4 py-2 text-sm font-medium transition-colors ${
-              isDestructive
-                ? 'bg-transparent border border-destructive text-destructive hover:bg-destructive/10'
-                : 'bg-accent hover:bg-accent-hover text-text-on-accent'
-            }`}
+            className={severity === 'destructive' || severity === 'warning' ? 'btn-refined bg-destructive text-text-on-accent hover:bg-destructive/90' : 'btn-refined btn-refined-primary'}
           >
             {confirmText}
           </button>
